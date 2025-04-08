@@ -1,11 +1,11 @@
 -- 主入口文件
-local Player = require('player')
-local Map = require('map')
-local Monster = require('monster')
-local ItemSystem = require('item')
-local CardController = require('card_controller')
-local InventoryController = require('inventory_controller')
-local CharacterUI = require('character_ui')
+local Player = require('src/entities/Player')
+local Map = require('src/systems/Map')
+local Monster = require('src/entities/Monster')
+local ItemSystem = require('src/systems/Item')
+local CardController = require('src/controllers/CardController')
+local InventoryController = require('src/controllers/InventoryController')
+local CharacterUI = require('src/ui/CharacterUI')
 
 -- 游戏状态
 local player
@@ -127,6 +127,11 @@ function love.draw()
     
     -- 绘制卡牌
     cardController:draw()
+    
+    -- 在最上层绘制物品提示（如果有）
+    if characterUI.visible and inventoryController and inventoryController.view.selectedItemInfo then
+        inventoryController.view:drawItemTooltip()
+    end
 end
 
 function drawUI()
@@ -201,7 +206,7 @@ function love.mousepressed(x, y, button)
             local tileX = math.floor(x / map.tileSize) * map.tileSize + map.tileSize/2
             local tileY = math.floor(y / map.tileSize) * map.tileSize + map.tileSize/2
             
-            if y < cardController.handArea.y then  -- 确保不会在手牌区域召唤
+            if y < cardController.view.handArea.y then  -- 确保不会在手牌区域召唤
                 -- 创建新怪物
                 local monster = Monster:new(cardController.selectedCard.config.monsterType, tileX, tileY)
                 if monster and monster.config then

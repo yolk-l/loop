@@ -2,54 +2,11 @@
 local Monster = {}
 Monster.__index = Monster
 
+-- 引入配置
+local MONSTER_CONFIG = require('config/monsters')
+
 -- 字体缓存
 local monsterFont = nil
-
--- 怪物配置
-local MONSTER_CONFIG = {
-    slime = {
-        name = "史莱姆",
-        color = {0.5, 0.8, 0.5},
-        size = 20,
-        attributes = {
-            maxHp = 10,
-            attack = 5,
-            defense = 2,
-            speed = 50,
-            exp = 10,     -- 击杀获得经验
-            attackRange = 30,  -- 攻击范围
-            detectRange = 100  -- 检测范围
-        }
-    },
-    goblin = {
-        name = "哥布林",
-        color = {0.8, 0.5, 0.3},
-        size = 25,
-        attributes = {
-            maxHp = 20,
-            attack = 8,
-            defense = 3,
-            speed = 80,
-            exp = 20,
-            attackRange = 40,
-            detectRange = 150
-        }
-    },
-    skeleton = {
-        name = "骷髅",
-        color = {0.8, 0.8, 0.8},
-        size = 30,
-        attributes = {
-            maxHp = 30,
-            attack = 12,
-            defense = 5,
-            speed = 60,
-            exp = 30,
-            attackRange = 50,
-            detectRange = 200
-        }
-    }
-}
 
 -- 初始化字体
 local function initFont()
@@ -198,80 +155,57 @@ function Monster:update(dt, map)
     
     -- 游荡状态的处理
     if self.status.state == "wander" then
-        if self.status.wanderTimer <= 0 or 
-           (self.status.wanderX and self:reachedTarget(self.status.wanderX, self.status.wanderY)) then
+        -- 需要选择新的游荡目标
+        if self.status.wanderTimer <= 0 or not self.status.wanderX then
             self:selectNewWanderTarget(map)
         end
         
-        if self.status.wanderX then
-            self:moveTowards({x = self.status.wanderX, y = self.status.wanderY}, dt)
+        -- 向游荡目标移动
+        if self.status.wanderX and self.status.wanderY then
+            if self:reachedTarget(self.status.wanderX, self.status.wanderY) then
+                -- 到达目标点，重置计时器
+                self.status.wanderTimer = 0
+            else
+                -- 向目标点移动
+                self:moveTowards({x = self.status.wanderX, y = self.status.wanderY}, dt)
+            end
         end
     end
+end
+
+function Monster:setTarget(target)
+    self.status.target = target
 end
 
 function Monster:draw()
     if self.status.isDead then return end
     
-    -- 绘制怪物本体
+    -- 绘制怪物
     love.graphics.setColor(unpack(self.config.color))
-    if self.status.isAttacking then
-        love.graphics.setColor(
-            self.config.color[1] * 1.2,
-            self.config.color[2] * 1.2,
-            self.config.color[3] * 1.2
-        )
-    end
     love.graphics.circle('fill', self.x, self.y, self.config.size)
     
     -- 绘制边框
     love.graphics.setColor(0.3, 0.3, 0.3)
     love.graphics.circle('line', self.x, self.y, self.config.size)
     
-    -- 绘制血条背景
-    love.graphics.setColor(0.3, 0.3, 0.3)
-    love.graphics.rectangle('fill', 
-        self.x - self.config.size, 
-        self.y - self.config.size - 10, 
-        self.config.size * 2, 
-        5)
+    -- 绘制生命条
+    local hpBarWidth = self.config.size * 2
+    local hpBarHeight = 5
+    local hpPercentage = self.hp / self.attributes.maxHp
     
-    -- 绘制血条
-    love.graphics.setColor(0.8, 0.2, 0.2)
-    love.graphics.rectangle('fill', 
-        self.x - self.config.size, 
-        self.y - self.config.size - 10, 
-        (self.config.size * 2) * (self.hp / self.attributes.maxHp), 
-        5)
+    love.graphics.setColor(0.2, 0.2, 0.2)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.config.size - 10, hpBarWidth, hpBarHeight)
     
-    -- 绘制怪物名称和等级
+    love.graphics.setColor(1 - hpPercentage, hpPercentage, 0.2)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.config.size - 10, hpBarWidth * hpPercentage, hpBarHeight)
+    
+    -- 绘制怪物名称
     love.graphics.setFont(monsterFont)
     love.graphics.setColor(1, 1, 1)
-    local nameText = string.format("%s", self.config.name)
-    local hpText = string.format("%d/%d", self.hp, self.attributes.maxHp)
-    local textWidth = monsterFont:getWidth(nameText)
-    love.graphics.print(
-        nameText,
-        self.x - textWidth/2,
-        self.y - self.config.size - 25
-    )
-    love.graphics.print(
-        hpText,
-        self.x - textWidth/2,
-        self.y + self.config.size + 5
-    )
-    
-    -- 如果在攻击中，显示攻击范围
-    if self.status.isAttacking then
-        love.graphics.setColor(1, 0, 0, 0.2)
-        love.graphics.circle('line', self.x, self.y, self.attributes.attackRange)
-    end
+    love.graphics.print(self.config.name, self.x - monsterFont:getWidth(self.config.name)/2, self.y - self.config.size - 25)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
-end
-
-function Monster:setTarget(target)
-    self.status.target = target
 end
 
 return Monster 
