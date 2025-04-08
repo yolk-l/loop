@@ -7,6 +7,8 @@ local ItemSystem = require('src/systems/Item')
 local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
+local Timer = require('lib/timer')  -- 引入timer库
+local PixelSprites = require('src/utils/PixelSprites')  -- 引入精灵生成工具
 
 -- 游戏状态
 local player
@@ -18,14 +20,25 @@ local cardController
 local inventoryController
 local characterUI
 local gameFont
+local gameTimer  -- 全局计时器实例
+local attackEffects = {}  -- 攻击效果数组
 
 function love.load()
-    -- 加载字体
-    gameFont = love.graphics.newFont("assets/fonts/simsun.ttc", 14)
-    love.graphics.setFont(gameFont)
+    -- 生成像素精灵表
+    PixelSprites.generateSprites()
+    
+    -- 初始化动画系统
+    local AnimationSystem = require('src/systems/Animation')
+    AnimationSystem.initialize()
+    
+    -- 使用默认字体
+    gameFont = love.graphics.getFont()
     
     -- 设置窗口大小
     love.window.setMode(900, 800)
+    
+    -- 初始化计时器
+    gameTimer = Timer.new()
     
     -- 初始化地图
     map = Map:new()
@@ -33,6 +46,8 @@ function love.load()
     -- 初始化玩家
     player = Player:new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
     player:setMap(map)
+    player:setTimer(gameTimer)  -- 传递timer实例给Player对象
+    player:setAttackEffects(attackEffects)  -- 传递攻击特效数组给玩家
     
     -- 初始化卡牌控制器
     cardController = CardController:new()
@@ -51,6 +66,9 @@ function love.load()
 end
 
 function love.update(dt)
+    -- 更新计时器
+    gameTimer:update(dt)
+    
     -- 更新游戏逻辑
     player:update(dt)
     
@@ -135,6 +153,12 @@ function love.draw()
     -- 绘制玩家
     player:draw()
     
+    -- 绘制攻击特效
+    for _, effect in ipairs(attackEffects) do
+        love.graphics.setColor(effect.color[1], effect.color[2], effect.color[3], effect.alpha or 1)
+        love.graphics.circle("fill", effect.x, effect.y, effect.size)
+    end
+    
     -- 绘制UI
     drawUI()
     
@@ -150,6 +174,9 @@ function love.draw()
     if characterUI.visible and inventoryController and inventoryController.view.selectedItemInfo then
         inventoryController.view:drawItemTooltip()
     end
+    
+    -- 重置颜色
+    love.graphics.setColor(1, 1, 1)
 end
 
 function drawUI()

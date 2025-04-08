@@ -5,7 +5,11 @@ local TERRAIN_TYPES = {
     GRASS = 1,
     WATER = 2,
     SAND = 3,
-    FOREST = 4
+    FOREST = 4,
+    MOUNTAIN = 5,  -- 新增：山地
+    SNOW = 6,      -- 新增：雪地
+    SWAMP = 7,     -- 新增：沼泽
+    VOLCANO = 8    -- 新增：火山
 }
 
 -- 地形颜色配置
@@ -13,7 +17,11 @@ local TERRAIN_COLORS = {
     [TERRAIN_TYPES.GRASS] = {0.3, 0.8, 0.3},  -- 绿色草地
     [TERRAIN_TYPES.WATER] = {0.2, 0.5, 0.9},  -- 蓝色水域
     [TERRAIN_TYPES.SAND] = {0.95, 0.85, 0.55},   -- 黄色沙地
-    [TERRAIN_TYPES.FOREST] = {0.15, 0.55, 0.15}  -- 深绿色森林
+    [TERRAIN_TYPES.FOREST] = {0.15, 0.55, 0.15},  -- 深绿色森林
+    [TERRAIN_TYPES.MOUNTAIN] = {0.6, 0.6, 0.6},  -- 灰色山地
+    [TERRAIN_TYPES.SNOW] = {0.95, 0.95, 0.95},   -- 白色雪地
+    [TERRAIN_TYPES.SWAMP] = {0.4, 0.5, 0.2},    -- 暗绿色沼泽
+    [TERRAIN_TYPES.VOLCANO] = {0.5, 0.2, 0.1}    -- 暗红色火山
 }
 
 -- 地形装饰物配置
@@ -276,6 +284,261 @@ local TERRAIN_DECORATIONS = {
                 love.graphics.ellipse('fill', mushroomX, mushroomY - size/10, size/15, size/30)
             end
         end
+    },
+    [TERRAIN_TYPES.MOUNTAIN] = {
+        chance = 0.8,  -- 山地装饰几率
+        draw = function(x, y, size)
+            -- 绘制山石
+            local rockCount = math.random(1, 3)
+            local rockColors = {
+                {0.5, 0.5, 0.5}, -- 灰色
+                {0.45, 0.42, 0.4}, -- 褐灰色
+                {0.6, 0.58, 0.55} -- 浅灰色
+            }
+            
+            for i = 1, rockCount do
+                local rockColor = rockColors[math.random(1, #rockColors)]
+                love.graphics.setColor(rockColor[1], rockColor[2], rockColor[3])
+                
+                local rockX = x + math.random(5, size - 5)
+                local rockY = y + math.random(5, size - 5)
+                local rockSize = size / 3 + math.random() * size / 6
+                
+                -- 不规则多边形岩石
+                local vertices = {}
+                local pointCount = math.random(5, 8)
+                for j = 1, pointCount do
+                    local angle = (j - 1) * (2 * math.pi / pointCount)
+                    local radius = rockSize * (0.7 + math.random() * 0.3)
+                    table.insert(vertices, rockX + math.cos(angle) * radius)
+                    table.insert(vertices, rockY + math.sin(angle) * radius)
+                end
+                
+                love.graphics.polygon('fill', unpack(vertices))
+                
+                -- 岩石阴影
+                love.graphics.setColor(rockColor[1] * 0.8, rockColor[2] * 0.8, rockColor[3] * 0.8)
+                love.graphics.line(vertices[1], vertices[2], vertices[3], vertices[4])
+                
+                -- 有时添加雪顶
+                if math.random() < 0.3 then
+                    love.graphics.setColor(0.95, 0.95, 0.95, 0.7)
+                    love.graphics.polygon('fill', 
+                        vertices[1], vertices[2], 
+                        vertices[3], vertices[4], 
+                        vertices[5], vertices[6])
+                end
+            end
+            
+            -- 偶尔添加山羊
+            if math.random() < 0.05 then
+                love.graphics.setColor(0.8, 0.8, 0.7)
+                local goatX = x + math.random(5, size - 5)
+                local goatY = y + math.random(5, size - 5)
+                love.graphics.circle('fill', goatX, goatY, size/12)  -- 身体
+                love.graphics.circle('fill', goatX + size/16, goatY - size/20, size/18)  -- 头
+                love.graphics.setColor(0.3, 0.3, 0.3)
+                love.graphics.line(goatX + size/12, goatY - size/15, goatX + size/8, goatY - size/10)  -- 角
+                love.graphics.line(goatX - size/12, goatY, goatX - size/8, goatY + size/12)  -- 尾巴
+                love.graphics.line(goatX - size/12, goatY + size/15, goatX - size/12, goatY + size/8)  -- 腿
+                love.graphics.line(goatX + size/12, goatY + size/15, goatX + size/12, goatY + size/8)  -- 腿
+            end
+        end
+    },
+    [TERRAIN_TYPES.SNOW] = {
+        chance = 0.6,  -- 雪地装饰几率
+        draw = function(x, y, size)
+            -- 雪堆
+            love.graphics.setColor(1, 1, 1, 0.8)
+            love.graphics.circle('fill', x + size/2, y + size/2, size/4 + math.random() * size/8)
+            
+            -- 随机雪花
+            local snowflakeCount = math.random(3, 8)
+            love.graphics.setColor(1, 1, 1, 0.9)
+            
+            for i = 1, snowflakeCount do
+                local flakeX = x + math.random(2, size - 2)
+                local flakeY = y + math.random(2, size - 2)
+                local flakeSize = size / 40 + math.random() * size / 40
+                
+                -- 简单雪花
+                love.graphics.circle('fill', flakeX, flakeY, flakeSize)
+                
+                -- 复杂雪花
+                if math.random() < 0.2 then
+                    for j = 0, 5 do
+                        local angle = j * math.pi / 3
+                        local length = flakeSize * 2
+                        love.graphics.line(
+                            flakeX, flakeY,
+                            flakeX + math.cos(angle) * length,
+                            flakeY + math.sin(angle) * length
+                        )
+                    end
+                end
+            end
+            
+            -- 偶尔添加雪人
+            if math.random() < 0.08 then
+                love.graphics.setColor(1, 1, 1)
+                local snowmanX = x + size/2
+                local snowmanY = y + size/2
+                
+                -- 雪人身体（两个雪球）
+                love.graphics.circle('fill', snowmanX, snowmanY, size/8)
+                love.graphics.circle('fill', snowmanX, snowmanY - size/10, size/12)
+                
+                -- 雪人眼睛和按钮
+                love.graphics.setColor(0, 0, 0)
+                love.graphics.circle('fill', snowmanX - size/25, snowmanY - size/10, size/60)
+                love.graphics.circle('fill', snowmanX + size/25, snowmanY - size/10, size/60)
+                love.graphics.circle('fill', snowmanX, snowmanY - size/20, size/60)
+                love.graphics.circle('fill', snowmanX, snowmanY, size/60)
+                
+                -- 胡萝卜鼻子
+                love.graphics.setColor(1, 0.6, 0.2)
+                love.graphics.polygon('fill', 
+                    snowmanX, snowmanY - size/10,
+                    snowmanX + size/20, snowmanY - size/11,
+                    snowmanX, snowmanY - size/9
+                )
+            end
+        end
+    },
+    [TERRAIN_TYPES.SWAMP] = {
+        chance = 0.7,  -- 沼泽装饰几率
+        draw = function(x, y, size)
+            -- 沼泽水面
+            love.graphics.setColor(0.3, 0.4, 0.2, 0.5)
+            local poolSize = math.random() * size/3 + size/6
+            love.graphics.circle('fill', x + size/2, y + size/2, poolSize)
+            
+            -- 气泡
+            if math.random() < 0.5 then
+                love.graphics.setColor(0.5, 0.6, 0.4, 0.3)
+                local bubbleCount = math.random(1, 3)
+                for i = 1, bubbleCount do
+                    love.graphics.circle('line', 
+                        x + size/2 + math.random(-poolSize/2, poolSize/2), 
+                        y + size/2 + math.random(-poolSize/2, poolSize/2), 
+                        size/30)
+                end
+            end
+            
+            -- 沼泽植物
+            love.graphics.setColor(0.2, 0.5, 0.1)
+            local plantCount = math.random(1, 3)
+            for i = 1, plantCount do
+                local plantX = x + math.random(5, size - 5)
+                local plantY = y + math.random(5, size - 5)
+                
+                -- 芦苇或沼泽植物
+                local plantHeight = size/4 + math.random() * size/8
+                love.graphics.line(plantX, plantY, plantX, plantY - plantHeight)
+                
+                -- 叶子
+                love.graphics.line(
+                    plantX, plantY - plantHeight/2,
+                    plantX + size/10, plantY - plantHeight/2 - size/20
+                )
+                love.graphics.line(
+                    plantX, plantY - plantHeight*3/4,
+                    plantX - size/10, plantY - plantHeight*3/4 - size/20
+                )
+            end
+            
+            -- 偶尔添加青蛙
+            if math.random() < 0.15 then
+                love.graphics.setColor(0.3, 0.7, 0.3)
+                local frogX = x + math.random(5, size - 5)
+                local frogY = y + math.random(5, size - 5)
+                
+                -- 青蛙身体
+                love.graphics.circle('fill', frogX, frogY, size/15)
+                
+                -- 青蛙眼睛
+                love.graphics.setColor(1, 1, 1)
+                love.graphics.circle('fill', frogX - size/30, frogY - size/30, size/40)
+                love.graphics.circle('fill', frogX + size/30, frogY - size/30, size/40)
+                
+                -- 青蛙瞳孔
+                love.graphics.setColor(0, 0, 0)
+                love.graphics.circle('fill', frogX - size/30, frogY - size/30, size/80)
+                love.graphics.circle('fill', frogX + size/30, frogY - size/30, size/80)
+            end
+        end
+    },
+    [TERRAIN_TYPES.VOLCANO] = {
+        chance = 0.8,  -- 火山装饰几率
+        draw = function(x, y, size)
+            -- 火山锥体
+            local volcanoX = x + size/2
+            local volcanoY = y + size/2
+            
+            -- 火山基座
+            love.graphics.setColor(0.3, 0.2, 0.1)
+            love.graphics.polygon('fill',
+                volcanoX - size/2, volcanoY + size/3,
+                volcanoX + size/2, volcanoY + size/3,
+                volcanoX + size/3, volcanoY - size/4,
+                volcanoX - size/3, volcanoY - size/4
+            )
+            
+            -- 火山口
+            love.graphics.setColor(0.8, 0.2, 0.1)
+            love.graphics.circle('fill', volcanoX, volcanoY - size/8, size/8)
+            
+            -- 熔岩
+            love.graphics.setColor(1, 0.5, 0.1)
+            love.graphics.circle('fill', volcanoX, volcanoY - size/8, size/12)
+            
+            -- 偶尔喷发
+            if math.random() < 0.3 then
+                love.graphics.setColor(1, 0.3, 0.1, 0.8)
+                
+                -- 熔岩流
+                local lavaStreamCount = math.random(3, 5)
+                for i = 1, lavaStreamCount do
+                    local angle = math.random() * math.pi - math.pi/2  -- 向上的一半圆
+                    local length = size/4 + math.random() * size/4
+                    love.graphics.line(
+                        volcanoX, volcanoY - size/8,
+                        volcanoX + math.cos(angle) * length,
+                        volcanoY - size/8 + math.sin(angle) * length
+                    )
+                end
+                
+                -- 火花
+                local sparkCount = math.random(3, 8)
+                love.graphics.setColor(1, 0.6, 0.2, 0.9)
+                for i = 1, sparkCount do
+                    local sparkX = volcanoX + math.random(-size/8, size/8)
+                    local sparkY = volcanoY - size/8 - math.random(0, size/4)
+                    love.graphics.circle('fill', sparkX, sparkY, size/40)
+                end
+            end
+            
+            -- 火山周围的岩石
+            local rockCount = math.random(2, 4)
+            for i = 1, rockCount do
+                love.graphics.setColor(0.4, 0.3, 0.2)
+                local rockX = x + math.random(5, size-5)
+                local rockY = y + math.random(size/2, size-5)  -- 只在下半部分
+                local rockSize = size/12 + math.random() * size/12
+                
+                -- 不规则形状的岩石
+                local vertices = {}
+                local pointCount = math.random(5, 7)
+                for j = 1, pointCount do
+                    local angle = (j - 1) * (2 * math.pi / pointCount)
+                    local radius = rockSize * (0.8 + math.random() * 0.4)
+                    table.insert(vertices, rockX + math.cos(angle) * radius)
+                    table.insert(vertices, rockY + math.sin(angle) * radius)
+                end
+                
+                love.graphics.polygon('fill', unpack(vertices))
+            end
+        end
     }
 }
 
@@ -284,7 +547,11 @@ local TERRAIN_SPEED_MODIFIER = {
     [TERRAIN_TYPES.GRASS] = 1.0,   -- 草地正常速度
     [TERRAIN_TYPES.WATER] = 0.0,   -- 水面不能走
     [TERRAIN_TYPES.SAND] = 0.7,    -- 沙地减速
-    [TERRAIN_TYPES.FOREST] = 0.8   -- 森林减速
+    [TERRAIN_TYPES.FOREST] = 0.8,  -- 森林减速
+    [TERRAIN_TYPES.MOUNTAIN] = 0.5, -- 山地大幅减速
+    [TERRAIN_TYPES.SNOW] = 0.6,     -- 雪地减速
+    [TERRAIN_TYPES.SWAMP] = 0.4,    -- 沼泽严重减速
+    [TERRAIN_TYPES.VOLCANO] = 0.3   -- 火山地区严重减速
 }
 
 return {

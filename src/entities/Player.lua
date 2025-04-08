@@ -8,6 +8,8 @@ local TerrainConfig = require('config/terrain')
 
 -- 字体缓存
 local playerFont = nil
+local gameTimer = nil  -- 引用全局计时器实例
+local attackEffects  -- 全局攻击特效数组的引用
 
 -- 初始化字体
 local function initFont()
@@ -118,8 +120,8 @@ function Player:update(dt)
         end
     end
     
-    -- 检查攻击状态持续时间
-    if self.status.isAttacking then
+    -- 如果没有全局timer，则使用手动计时方式
+    if not gameTimer and self.status.isAttacking then
         local currentTime = love.timer.getTime()
         if currentTime - self.status.attackStartTime > 0.2 then
             self.status.isAttacking = false  -- 攻击效果结束
@@ -157,19 +159,69 @@ function Player:autoAttack(monsters)
 end
 
 function Player:attack(target)
-    if not target or target.status.isDead then
-        return false
+    -- 检查是否在攻击冷却中
+    local currentTime = love.timer.getTime()
+    if currentTime - self.attributes.lastAttackTime < self.attributes.attackCooldown then
+        return false  -- 冷却中，不能攻击
     end
     
-    self.attributes.lastAttackTime = love.timer.getTime()
-    self.status.isAttacking = true
-    self.status.attackStartTime = love.timer.getTime()  -- 记录攻击开始时间
+    if target then
+        -- 计算玩家到目标的距离
+        local dx = target.x - self.x
+        local dy = target.y - self.y
+        local distance = math.sqrt(dx*dx + dy*dy)
+        
+        -- 如果目标在攻击范围内
+        if distance <= self.status.attackRange then
+            -- 将玩家状态设置为攻击中
+            self.status.isAttacking = true
+            self.status.attackStartTime = currentTime
+            self.attributes.lastAttackTime = currentTime  -- 设置上次攻击时间，启动冷却
+            
+            -- 计算伤害
+            local damage = math.max(1, self.attributes.attack - (target.attributes.defense or 0))
+            target:takeDamage(damage)
+            
+            -- 创建攻击特效
+            local effect = {
+                x = target.x,
+                y = target.y,
+                size = 20,
+                alpha = 0.8,
+                color = {1, 0, 0}  -- 红色
+            }
+            
+            -- 添加到全局特效数组
+            table.insert(attackEffects, effect)
+            
+            -- 使用计时器实现特效动画和移除
+            if gameTimer then
+                gameTimer:after(0.3, function()
+                    -- 找到并移除特效
+                    for i, e in ipairs(attackEffects) do
+                        if e == effect then
+                            table.remove(attackEffects, i)
+                            break
+                        end
+                    end
+                end)
+                
+                -- 特效动画 - 逐渐扩大并淡出
+                gameTimer:tween(0.3, effect, {size = 40, alpha = 0}, 'linear')
+            end
+            
+            -- 使用计时器延迟重置攻击状态
+            if gameTimer then
+                gameTimer:after(0.2, function()
+                    self.status.isAttacking = false
+                end)
+            end
+            
+            return true  -- 攻击成功
+        end
+    end
     
-    -- 计算伤害并应用
-    local damage = self.attributes.attack
-    local actualDamage = target:takeDamage(damage)
-    
-    return actualDamage
+    return false  -- 攻击失败
 end
 
 function Player:canBuildAt(x, y)
@@ -451,6 +503,15 @@ function Player:draw()
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
+end
+
+-- 设置timer实例（从main.lua传入）
+function Player:setTimer(timer)
+    gameTimer = timer
+end
+
+function Player:setAttackEffects(effects)
+    attackEffects = effects
 end
 
 return Player 

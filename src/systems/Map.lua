@@ -100,34 +100,202 @@ function Map:generateMap()
     local waterSeed = math.random(1, 1000)
     local forestSeed = math.random(1, 1000)
     local sandSeed = math.random(1, 1000)
+    local mountainSeed = math.random(1, 1000)
+    local snowSeed = math.random(1, 1000)
+    local swampSeed = math.random(1, 1000)
+    local volcanoSeed = math.random(1, 1000)
     
     -- 初始化地图
     for y = 1, self.gridHeight do
         self.tiles[y] = {}
         for x = 1, self.gridWidth do
             -- 生成各种地形的噪声值
-            local waterNoise = self:perlinNoise(x/6, y/6, waterSeed, 4)  -- 增加缩放比例使地形更平滑
-            local forestNoise = self:perlinNoise(x/8, y/8, forestSeed, 3)
-            local sandNoise = self:perlinNoise(x/5, y/5, sandSeed, 2)
+            local waterNoise = self:perlinNoise(x/6, y/6, waterSeed, 4)  -- 水域
+            local forestNoise = self:perlinNoise(x/8, y/8, forestSeed, 3)  -- 森林
+            local sandNoise = self:perlinNoise(x/5, y/5, sandSeed, 2)  -- 沙地
+            local mountainNoise = self:perlinNoise(x/7, y/7, mountainSeed, 4)  -- 山地
+            local snowNoise = self:perlinNoise(x/8, y/8, snowSeed, 3)  -- 雪地
+            local swampNoise = self:perlinNoise(x/5, y/5, swampSeed, 2)  -- 沼泽
+            local volcanoNoise = self:perlinNoise(x/9, y/9, volcanoSeed, 3)  -- 火山
+            
+            -- 添加全局高度图，将世界分为不同的高度区域
+            local heightNoise = self:perlinNoise(x/12, y/12, 12345, 4)
             
             -- 默认为草地
             local terrainType = TerrainConfig.TERRAIN_TYPES.GRASS
             
-            -- 根据噪声值决定地形
-            if waterNoise > 0.7 then
-                terrainType = TerrainConfig.TERRAIN_TYPES.WATER
-            elseif waterNoise > 0.6 and sandNoise > 0.6 then
-                terrainType = TerrainConfig.TERRAIN_TYPES.SAND
-            elseif forestNoise > 0.6 and waterNoise < 0.5 then
-                terrainType = TerrainConfig.TERRAIN_TYPES.FOREST
+            -- 根据高度和噪声值决定地形
+            if heightNoise < 0.3 then
+                -- 低地: 水域、沙地、沼泽
+                if waterNoise > 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.WATER
+                elseif sandNoise > 0.7 and waterNoise > 0.4 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.SAND
+                elseif swampNoise > 0.7 and waterNoise > 0.3 and waterNoise < 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.SWAMP
+                end
+            elseif heightNoise < 0.6 then
+                -- 中地: 草地、森林
+                if forestNoise > 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.FOREST
+                end
+                
+                -- 沿水边生成沙地和沼泽
+                if waterNoise > 0.5 and waterNoise < 0.6 then
+                    if sandNoise > 0.6 then
+                        terrainType = TerrainConfig.TERRAIN_TYPES.SAND
+                    elseif swampNoise > 0.7 then
+                        terrainType = TerrainConfig.TERRAIN_TYPES.SWAMP
+                    end
+                end
+            elseif heightNoise < 0.85 then
+                -- 高地: 山地
+                if mountainNoise > 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.MOUNTAIN
+                    
+                    -- 山顶有时有雪
+                    if heightNoise > 0.75 and snowNoise > 0.7 then
+                        terrainType = TerrainConfig.TERRAIN_TYPES.SNOW
+                    end
+                end
+            else
+                -- 最高地: 雪地，偶尔有火山
+                if volcanoNoise > 0.85 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.VOLCANO
+                else
+                    terrainType = TerrainConfig.TERRAIN_TYPES.SNOW
+                end
             end
             
             self.tiles[y][x] = terrainType
         end
     end
     
-    -- 后处理：确保水域周围有沙地
+    -- 后处理：平滑地形
+    self:smoothTerrain()
+    
+    -- 后处理：确保水域周围有沙地或沼泽
     self:postProcessTerrain()
+end
+
+-- 平滑地形，避免孤立的地块
+function Map:smoothTerrain()
+    local changes = {}
+    
+    -- 临时复制地图
+    local tempMap = {}
+    for y = 1, self.gridHeight do
+        tempMap[y] = {}
+        for x = 1, self.gridWidth do
+            tempMap[y][x] = self.tiles[y][x]
+        end
+    end
+    
+    -- 平滑算法
+    for y = 2, self.gridHeight - 1 do
+        for x = 2, self.gridWidth - 1 do
+            -- 统计周围8个格子的地形类型
+            local terrainCounts = {}
+            
+            for ny = y-1, y+1 do
+                for nx = x-1, x+1 do
+                    if not (nx == x and ny == y) then
+                        local terrain = self.tiles[ny][nx]
+                        terrainCounts[terrain] = (terrainCounts[terrain] or 0) + 1
+                    end
+                end
+            end
+            
+            -- 找出出现最多的地形类型
+            local mostCommonTerrain = self.tiles[y][x]
+            local maxCount = 0
+            
+            for terrain, count in pairs(terrainCounts) do
+                if count > maxCount then
+                    maxCount = count
+                    mostCommonTerrain = terrain
+                end
+            end
+            
+            -- 如果周围超过5个格子都是同一类型，则转换当前格子
+            if maxCount >= 5 and mostCommonTerrain ~= self.tiles[y][x] then
+                tempMap[y][x] = mostCommonTerrain
+            end
+        end
+    end
+    
+    -- 应用更改
+    self.tiles = tempMap
+end
+
+-- 后处理：确保地形边界自然过渡
+function Map:postProcessTerrain()
+    local changes = {}
+    
+    for y = 2, self.gridHeight - 1 do
+        for x = 2, self.gridWidth - 1 do
+            -- 水域周围生成沙地或沼泽
+            if self.tiles[y][x] == TerrainConfig.TERRAIN_TYPES.WATER then
+                for ny = y-1, y+1 do
+                    for nx = x-1, x+1 do
+                        if self:isValidPosition(nx, ny) and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.WATER and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.SAND and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.SWAMP then
+                            
+                            -- 50%几率为沙地，50%几率为沼泽
+                            if math.random() < 0.5 then
+                                table.insert(changes, {x = nx, y = ny, type = TerrainConfig.TERRAIN_TYPES.SAND})
+                            else
+                                table.insert(changes, {x = nx, y = ny, type = TerrainConfig.TERRAIN_TYPES.SWAMP})
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- 山地和雪地之间的过渡
+            if self.tiles[y][x] == TerrainConfig.TERRAIN_TYPES.MOUNTAIN then
+                for ny = y-1, y+1 do
+                    for nx = x-1, x+1 do
+                        if self:isValidPosition(nx, ny) and
+                           self.tiles[ny][nx] == TerrainConfig.TERRAIN_TYPES.SNOW then
+                            -- 山地旁边的雪地会扩展到山地上
+                            table.insert(changes, {x = x, y = y, type = TerrainConfig.TERRAIN_TYPES.SNOW})
+                            break
+                        end
+                    end
+                end
+            end
+            
+            -- 火山周围生成山地
+            if self.tiles[y][x] == TerrainConfig.TERRAIN_TYPES.VOLCANO then
+                for ny = y-2, y+2 do
+                    for nx = x-2, x+2 do
+                        if self:isValidPosition(nx, ny) and
+                           not (nx == x and ny == y) and
+                           math.random() < 0.7 and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.VOLCANO and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.MOUNTAIN and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.WATER then
+                            
+                            table.insert(changes, {x = nx, y = ny, type = TerrainConfig.TERRAIN_TYPES.MOUNTAIN})
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- 应用更改
+    for _, change in ipairs(changes) do
+        self.tiles[change.y][change.x] = change.type
+    end
+end
+
+-- 辅助函数：检查坐标是否在地图范围内
+function Map:isValidPosition(x, y)
+    return x >= 1 and x <= self.gridWidth and y >= 1 and y <= self.gridHeight
 end
 
 -- 生成高分辨率地形数据，用于绘制平滑过渡
@@ -237,34 +405,6 @@ function Map:smoothHighResMap()
         for _, change in ipairs(changes) do
             self.highResMap[change.y][change.x] = change.type
         end
-    end
-end
-
-function Map:postProcessTerrain()
-    -- 创建一个临时表来存储要更改的瓦片
-    local changes = {}
-    
-    for y = 1, self.gridHeight do
-        for x = 1, self.gridWidth do
-            -- 如果是水域，检查周围的草地并将其改为沙地
-            if self.tiles[y][x] == TerrainConfig.TERRAIN_TYPES.WATER then
-                for dy = -1, 1 do
-                    for dx = -1, 1 do
-                        local nx, ny = x + dx, y + dy
-                        if nx >= 1 and nx <= self.gridWidth and ny >= 1 and ny <= self.gridHeight then
-                            if self.tiles[ny][nx] == TerrainConfig.TERRAIN_TYPES.GRASS then
-                                table.insert(changes, {x = nx, y = ny, type = TerrainConfig.TERRAIN_TYPES.SAND})
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- 应用更改
-    for _, change in ipairs(changes) do
-        self.tiles[change.y][change.x] = change.type
     end
 end
 
