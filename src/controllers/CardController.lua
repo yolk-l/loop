@@ -34,8 +34,24 @@ function CardController:removeCard(cardObject)
     return true
 end
 
-function CardController:getCardType(monsterType)
-    return self.model:getCardType(monsterType)
+function CardController:getBuildingType(cardIndex)
+    if not cardIndex or not self.model.cards[cardIndex] then
+        return nil
+    end
+    
+    local cardType = self.model.cards[cardIndex]
+    local card = Card:new(cardType)
+    
+    if card and card.config and card.config.buildingType then
+        return card.config.buildingType
+    end
+    
+    return nil
+end
+
+function CardController:getSelectedBuildingType()
+    if not self.selectedIndex then return nil end
+    return self:getBuildingType(self.selectedIndex)
 end
 
 function CardController:handleMouseClick(x, y)

@@ -24,13 +24,13 @@ function CardModel:removeCard(index)
     return false
 end
 
-function CardModel:getCardType(monsterType)
-    if monsterType == "slime" then
-        return CardConfig.CARD_TYPES.SLIME
-    elseif monsterType == "goblin" then
-        return CardConfig.CARD_TYPES.GOBLIN
-    elseif monsterType == "skeleton" then
-        return CardConfig.CARD_TYPES.SKELETON
+function CardModel:getBuildingCardType(buildingType)
+    if buildingType == "slime_nest" then
+        return CardConfig.CARD_TYPES.SLIME_NEST
+    elseif buildingType == "goblin_hut" then
+        return CardConfig.CARD_TYPES.GOBLIN_HUT
+    elseif buildingType == "skeleton_tomb" then
+        return CardConfig.CARD_TYPES.SKELETON_TOMB
     end
     return nil
 end

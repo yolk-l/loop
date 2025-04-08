@@ -70,9 +70,9 @@ end
 
 function Map:new()
     local self = setmetatable({}, Map)
-    self.tileSize = 30  -- 减小格子大小，原来是40
-    self.gridWidth = 26  -- 增加地图宽度，适应更小的格子
-    self.gridHeight = 20 -- 增加地图高度，适应更小的格子
+    self.tileSize = 20  -- 从30减小到20
+    self.gridWidth = 40  -- 从26增加到40
+    self.gridHeight = 30 -- 从20增加到30
     
     -- 初始化随机数生成器
     math.randomseed(os.time())
@@ -431,14 +431,18 @@ function Map:generateDecorations()
     end
 end
 
-function Map:getTerrainAt(pixelX, pixelY)
-    local gridX = math.floor(pixelX / self.tileSize) + 1
-    local gridY = math.floor(pixelY / self.tileSize) + 1
+-- 获取指定坐标位置的地形类型
+function Map:getTerrainAt(x, y)
+    -- 将像素坐标转换为网格坐标
+    local gridX = math.floor(x / self.tileSize) + 1
+    local gridY = math.floor(y / self.tileSize) + 1
     
+    -- 检查坐标是否在地图范围内
     if gridX >= 1 and gridX <= self.gridWidth and gridY >= 1 and gridY <= self.gridHeight then
         return self.tiles[gridY][gridX]
     end
     
+    -- 默认返回nil表示坐标超出地图范围
     return nil
 end
 

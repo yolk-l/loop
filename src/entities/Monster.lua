@@ -38,7 +38,11 @@ function Monster:new(type, x, y)
         wanderTimer = 0,      -- 随机移动计时器
         wanderX = nil,        -- 随机移动目标X
         wanderY = nil,        -- 随机移动目标Y
-        state = "wander"      -- AI状态：wander（游荡）, chase（追击）, attack（攻击）
+        state = "wander",     -- AI状态：wander（游荡）, chase（追击）, attack（攻击）
+        homeBuilding = nil,   -- 怪物所属的建筑
+        homeX = nil,          -- 出生地点X
+        homeY = nil,          -- 出生地点Y
+        wanderRadius = 80     -- 游荡半径，默认值
     }
     
     initFont()
@@ -77,18 +81,41 @@ function Monster:attack(target)
 end
 
 function Monster:selectNewWanderTarget(map)
-    -- 在地图范围内选择一个随机目标点
-    local mapWidth = map.gridWidth * map.tileSize
-    local mapHeight = map.gridHeight * map.tileSize
-    
-    local attempts = 0
-    local maxAttempts = 10
-    
-    repeat
-        self.status.wanderX = math.random(50, mapWidth - 50)
-        self.status.wanderY = math.random(50, mapHeight - 50)
-        attempts = attempts + 1
-    until attempts >= maxAttempts
+    -- 如果有所属建筑，则限制在建筑周围游荡
+    if self.status.homeX and self.status.homeY then
+        local attempts = 0
+        local maxAttempts = 10
+        local angle, distance, targetX, targetY
+        
+        repeat
+            angle = math.random() * math.pi * 2
+            distance = math.random(10, self.status.wanderRadius)
+            targetX = self.status.homeX + math.cos(angle) * distance
+            targetY = self.status.homeY + math.sin(angle) * distance
+            
+            -- 确保目标点在地图范围内
+            targetX = math.max(50, math.min(map.gridWidth * map.tileSize - 50, targetX))
+            targetY = math.max(50, math.min(map.gridHeight * map.tileSize - 50, targetY))
+            
+            attempts = attempts + 1
+        until attempts >= maxAttempts
+        
+        self.status.wanderX = targetX
+        self.status.wanderY = targetY
+    else
+        -- 在地图范围内选择一个随机目标点
+        local mapWidth = map.gridWidth * map.tileSize
+        local mapHeight = map.gridHeight * map.tileSize
+        
+        local attempts = 0
+        local maxAttempts = 10
+        
+        repeat
+            self.status.wanderX = math.random(50, mapWidth - 50)
+            self.status.wanderY = math.random(50, mapHeight - 50)
+            attempts = attempts + 1
+        until attempts >= maxAttempts
+    end
     
     self.status.wanderTimer = math.random(3, 6)  -- 3-6秒后重新选择目标
 end
@@ -127,8 +154,14 @@ function Monster:update(dt, map)
         end
     end
     
-    -- 更新随机移动计时器
-    self.status.wanderTimer = self.status.wanderTimer - dt
+    -- 获取地图中心（玩家所在位置）
+    local centerX = map.gridWidth * map.tileSize / 2
+    local centerY = map.gridHeight * map.tileSize / 2
+    
+    -- 计算与玩家的距离
+    local dx = centerX - self.x
+    local dy = centerY - self.y
+    local distanceToCenter = math.sqrt(dx * dx + dy * dy)
     
     -- 根据状态执行不同的行为
     if self.status.target then
@@ -136,39 +169,19 @@ function Monster:update(dt, map)
         local dy = self.status.target.y - self.y
         local distance = math.sqrt(dx * dx + dy * dy)
         
-        if distance <= self.attributes.detectRange then
-            if distance <= self.attributes.attackRange then
-                -- 在攻击范围内
-                self.status.state = "attack"
-                self:attack(self.status.target)
-            else
-                -- 在检测范围内但不在攻击范围内
-                self.status.state = "chase"
-                self:moveTowards(self.status.target, dt)
-            end
+        if distance <= self.attributes.attackRange then
+            -- 在攻击范围内
+            self.status.state = "attack"
+            self:attack(self.status.target)
         else
-            -- 目标超出检测范围，恢复游荡状态
-            self.status.state = "wander"
-            self.status.target = nil
+            -- 向目标移动
+            self.status.state = "chase"
+            self:moveTowards(self.status.target, dt)
         end
-    end
-    
-    -- 游荡状态的处理
-    if self.status.state == "wander" then
-        -- 需要选择新的游荡目标
-        if self.status.wanderTimer <= 0 or not self.status.wanderX then
-            self:selectNewWanderTarget(map)
-        end
-        
-        -- 向游荡目标移动
-        if self.status.wanderX and self.status.wanderY then
-            if self:reachedTarget(self.status.wanderX, self.status.wanderY) then
-                -- 到达目标点，重置计时器
-                self.status.wanderTimer = 0
-            else
-                -- 向目标点移动
-                self:moveTowards({x = self.status.wanderX, y = self.status.wanderY}, dt)
-            end
+    else
+        -- 直接向玩家位置移动
+        if distanceToCenter > self.attributes.attackRange then
+            self:moveTowards({x = centerX, y = centerY}, dt)
         end
     end
 end

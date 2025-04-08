@@ -21,8 +21,12 @@ function Player:new(x, y)
     self.x = x
     self.y = y
     self.baseSpeed = 80  -- 基础移动速度
-    self.size = 20       -- 玩家大小
+    self.size = 10       -- 玩家大小，从20减小到10
     self.map = nil       -- 地图引用
+    
+    -- 防御区域设置
+    self.defenseRadius = 150   -- 防御区域半径，不可建造建筑
+    self.attackRadius = 100    -- 攻击范围半径，自动攻击该范围内的怪物
     
     -- 属性系统
     self.attributes = {
@@ -33,7 +37,9 @@ function Player:new(x, y)
         level = 1,       -- 等级
         exp = 0,         -- 经验值
         nextLevelExp = 100,  -- 升级所需经验
-        speed = 80      -- 移动速度
+        speed = 80,      -- 移动速度
+        attackCooldown = 1.0,  -- 攻击冷却时间（秒）
+        lastAttackTime = 0     -- 上次攻击时间
     }
     
     -- 装备栏
@@ -49,6 +55,7 @@ function Player:new(x, y)
         attackCooldown = 0,   -- 攻击冷却
         attackRange = 50,     -- 攻击范围
         lastAttackTime = 0,   -- 上次攻击时间
+        attackStartTime = 0,  -- 攻击开始时间
         isAIControlled = false, -- 是否由AI控制
         targetMonster = nil,   -- 目标怪物
         wanderTimer = 0,      -- 随机移动计时器
@@ -71,6 +78,9 @@ end
 
 function Player:setMap(map)
     self.map = map
+    -- 重新定位玩家到地图中央
+    self.x = map.gridWidth * map.tileSize / 2
+    self.y = map.gridHeight * map.tileSize / 2
 end
 
 function Player:canMoveTo(newX, newY)
@@ -97,6 +107,81 @@ function Player:getSpeedModifier(x, y)
     return TerrainConfig.TERRAIN_SPEED_MODIFIER[terrain] or 1.0
 end
 
+function Player:update(dt)
+    -- 玩家固定在地图中央，所以不再处理移动逻辑
+    
+    -- 更新攻击冷却
+    if self.attributes.lastAttackTime > 0 then
+        local currentTime = love.timer.getTime()
+        if currentTime - self.attributes.lastAttackTime > self.attributes.attackCooldown then
+            self.attributes.lastAttackTime = 0  -- 冷却完毕
+        end
+    end
+    
+    -- 检查攻击状态持续时间
+    if self.status.isAttacking then
+        local currentTime = love.timer.getTime()
+        if currentTime - self.status.attackStartTime > 0.2 then
+            self.status.isAttacking = false  -- 攻击效果结束
+        end
+    end
+end
+
+function Player:autoAttack(monsters)
+    -- 如果正在冷却中，不进行攻击
+    if self.attributes.lastAttackTime > 0 then
+        return
+    end
+    
+    -- 查找范围内的怪物并攻击
+    local closestMonster = nil
+    local closestDistance = self.attackRadius
+    
+    for _, monster in ipairs(monsters) do
+        if not monster.status.isDead then
+            local dx = monster.x - self.x
+            local dy = monster.y - self.y
+            local distance = math.sqrt(dx * dx + dy * dy)
+            
+            if distance < closestDistance then
+                closestDistance = distance
+                closestMonster = monster
+            end
+        end
+    end
+    
+    -- 如果找到范围内的怪物，进行攻击
+    if closestMonster then
+        self:attack(closestMonster)
+    end
+end
+
+function Player:attack(target)
+    if not target or target.status.isDead then
+        return false
+    end
+    
+    self.attributes.lastAttackTime = love.timer.getTime()
+    self.status.isAttacking = true
+    self.status.attackStartTime = love.timer.getTime()  -- 记录攻击开始时间
+    
+    -- 计算伤害并应用
+    local damage = self.attributes.attack
+    local actualDamage = target:takeDamage(damage)
+    
+    return actualDamage
+end
+
+function Player:canBuildAt(x, y)
+    -- 计算距离玩家的距离
+    local dx = x - self.x
+    local dy = y - self.y
+    local distance = math.sqrt(dx * dx + dy * dy)
+    
+    -- 如果在防御区域内，不能建造
+    return distance > self.defenseRadius
+end
+
 function Player:gainExp(amount)
     self.attributes.exp = self.attributes.exp + amount
     -- 检查是否可以升级
@@ -115,6 +200,9 @@ function Player:levelUp()
     self.attributes.hp = self.attributes.maxHp  -- 升级时回满血
     self.attributes.attack = self.attributes.attack + 5
     self.attributes.defense = self.attributes.defense + 2
+    -- 每次升级时，稍微扩大防御和攻击范围
+    self.defenseRadius = self.defenseRadius + 5
+    self.attackRadius = self.attackRadius + 3
 end
 
 function Player:takeDamage(damage)
@@ -125,26 +213,6 @@ end
 
 function Player:heal(amount)
     self.attributes.hp = math.min(self.attributes.maxHp, self.attributes.hp + amount)
-end
-
-function Player:attack(monster)
-    local currentTime = love.timer.getTime()
-    if currentTime - self.status.lastAttackTime < 1.0 then  -- 1.0秒攻击冷却
-        return false
-    end
-    
-    -- 计算与怪物的距离
-    local dx = monster.x - self.x
-    local dy = monster.y - self.y
-    local distance = math.sqrt(dx * dx + dy * dy)
-    
-    if distance <= self.status.attackRange then
-        self.status.isAttacking = true
-        self.status.lastAttackTime = currentTime
-        return monster:takeDamage(self.attributes.attack)
-    end
-    
-    return false
 end
 
 function Player:setAIControl(enabled)
@@ -252,58 +320,6 @@ function Player:updateAI(dt, monsters)
     end
 end
 
-function Player:update(dt)
-    -- 更新攻击状态
-    if self.status.isAttacking then
-        if love.timer.getTime() - self.status.lastAttackTime > 0.5 then
-            self.status.isAttacking = false
-        end
-    end
-    
-    -- 处理玩家输入（如果不是AI控制）
-    if not self.status.isAIControlled then
-        local moveX = 0
-        local moveY = 0
-        
-        -- 键盘控制
-        if love.keyboard.isDown('up', 'w') then
-            moveY = -1
-        elseif love.keyboard.isDown('down', 's') then
-            moveY = 1
-        end
-        
-        if love.keyboard.isDown('left', 'a') then
-            moveX = -1
-        elseif love.keyboard.isDown('right', 'd') then
-            moveX = 1
-        end
-        
-        -- 对角线移动时，规格化移动向量
-        if moveX ~= 0 and moveY ~= 0 then
-            local length = math.sqrt(moveX * moveX + moveY * moveY)
-            moveX = moveX / length
-            moveY = moveY / length
-        end
-        
-        -- 计算速度修正
-        local speedModifier = self:getSpeedModifier(self.x, self.y)
-        local speed = self.attributes.speed * speedModifier * dt
-        
-        -- 计算新位置
-        local newX = self.x + moveX * speed
-        local newY = self.y + moveY * speed
-        
-        -- 检查是否可以移动到新位置
-        if self:canMoveTo(newX, newY) then
-            self.x = newX
-            self.y = newY
-        end
-    end
-    
-    -- 更新装备加成
-    self:updateEquipmentBonuses()
-end
-
 function Player:updateEquipmentBonuses()
     -- 保存旧的最大生命值和当前生命值比例
     local oldMaxHp = self.attributes.maxHp
@@ -370,6 +386,22 @@ function Player:equip(item)
 end
 
 function Player:draw()
+    -- 绘制防御区域（不可建造区域）
+    love.graphics.setColor(0.8, 0.2, 0.2, 0.15)  -- 淡红色
+    love.graphics.circle('fill', self.x, self.y, self.defenseRadius)
+    
+    -- 绘制防御区域边界
+    love.graphics.setColor(0.8, 0.2, 0.2, 0.5)
+    love.graphics.circle('line', self.x, self.y, self.defenseRadius)
+    
+    -- 绘制攻击范围
+    love.graphics.setColor(0.2, 0.6, 0.8, 0.1)  -- 淡蓝色
+    love.graphics.circle('fill', self.x, self.y, self.attackRadius)
+    
+    -- 绘制攻击范围边界
+    love.graphics.setColor(0.2, 0.6, 0.8, 0.3)
+    love.graphics.circle('line', self.x, self.y, self.attackRadius)
+    
     -- 绘制玩家
     love.graphics.setColor(0.2, 0.6, 1.0)
     love.graphics.circle('fill', self.x, self.y, self.size)
@@ -409,6 +441,12 @@ function Player:draw()
     if self.equipment.accessory then
         love.graphics.setColor(self.equipment.accessory.config.color)
         love.graphics.circle('fill', self.x + 15, self.y - self.size - 20, 3)
+    end
+    
+    -- 如果处于攻击状态，绘制攻击效果
+    if self.status.isAttacking then
+        love.graphics.setColor(1, 0.7, 0.2, 0.6)
+        love.graphics.circle('line', self.x, self.y, self.size * 1.5)
     end
     
     -- 重置颜色

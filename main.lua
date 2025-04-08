@@ -2,6 +2,7 @@
 local Player = require('src/entities/Player')
 local Map = require('src/systems/Map')
 local Monster = require('src/entities/Monster')
+local Building = require('src/entities/Building')
 local ItemSystem = require('src/systems/Item')
 local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
@@ -11,6 +12,7 @@ local CharacterUI = require('src/ui/CharacterUI')
 local player
 local map
 local monsters = {}
+local buildings = {}  -- 存储地图上的建筑
 local items = {}  -- 地上的掉落物
 local cardController
 local inventoryController
@@ -23,13 +25,13 @@ function love.load()
     love.graphics.setFont(gameFont)
     
     -- 设置窗口大小
-    love.window.setMode(800, 700)
+    love.window.setMode(900, 800)
     
     -- 初始化地图
     map = Map:new()
     
     -- 初始化玩家
-    player = Player:new(100, 100)
+    player = Player:new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
     player:setMap(map)
     
     -- 初始化卡牌控制器
@@ -51,7 +53,20 @@ end
 function love.update(dt)
     -- 更新游戏逻辑
     player:update(dt)
-    player:updateAI(dt, monsters)
+    
+    -- 玩家自动攻击范围内的怪物
+    player:autoAttack(monsters)
+    
+    -- 更新所有建筑
+    for i = #buildings, 1, -1 do
+        local building = buildings[i]
+        building:update(dt, monsters)
+        
+        -- 如果建筑消失，从列表中移除
+        if building.status.isDead then
+            table.remove(buildings, i)
+        end
+    end
     
     -- 更新所有怪物并处理死亡
     for i = #monsters, 1, -1 do
@@ -65,10 +80,8 @@ function love.update(dt)
             for _, drop in ipairs(drops) do
                 if drop.isCard then
                     -- 创建卡牌
-                    local cardType = cardController:getCardType(drop.monsterType)
-                    if cardType then
-                        cardController:addCard(cardType)
-                    end
+                    local cardType = drop.buildingCardType or math.random(1, 3)
+                    cardController:addCard(cardType)
                 else
                     -- 添加装备掉落物
                     if not inventoryController:addItem(drop) then
@@ -103,6 +116,11 @@ end
 function love.draw()
     -- 绘制地图
     map:draw()
+    
+    -- 绘制所有建筑
+    for _, building in ipairs(buildings) do
+        building:draw()
+    end
     
     -- 绘制所有掉落物
     for _, item in ipairs(items) do
@@ -142,6 +160,10 @@ function drawUI()
     love.graphics.print(string.format("经验: %d/%d", player.attributes.exp, player.attributes.nextLevelExp), 10, statsY + 20)
     love.graphics.print(string.format("攻击: %d", player.attributes.attack), 10, statsY + 40)
     love.graphics.print(string.format("防御: %d", player.attributes.defense), 10, statsY + 60)
+    
+    -- 绘制建筑和怪物数量
+    love.graphics.print(string.format("建筑: %d", #buildings), 10, statsY + 80)
+    love.graphics.print(string.format("怪物: %d", #monsters), 10, statsY + 100)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
@@ -200,18 +222,50 @@ function love.mousepressed(x, y, button)
             return
         end
         
-        -- 如果有选中的卡牌，尝试在点击位置召唤怪物
+        -- 如果有选中的卡牌，尝试在点击位置放置建筑
         if cardController.selectedCard and cardController.selectedCard.config then
-            -- 检查点击位置是否在地图范围内
-            local tileX = math.floor(x / map.tileSize) * map.tileSize + map.tileSize/2
-            local tileY = math.floor(y / map.tileSize) * map.tileSize + map.tileSize/2
-            
-            if y < cardController.view.handArea.y then  -- 确保不会在手牌区域召唤
-                -- 创建新怪物
-                local monster = Monster:new(cardController.selectedCard.config.monsterType, tileX, tileY)
-                if monster and monster.config then
-                    table.insert(monsters, monster)
-                    cardController:removeCard(cardController.selectedCard)
+            -- 检查点击位置是否在地图范围内且不在手牌区域
+            if y < cardController.view.handArea.y then
+                local tileX = math.floor(x / map.tileSize) * map.tileSize + map.tileSize/2
+                local tileY = math.floor(y / map.tileSize) * map.tileSize + map.tileSize/2
+
+                -- 获取地形类型并进行判断
+                local terrain = map:getTerrainAt(tileX, tileY)
+                print("尝试在 x=" .. tileX .. ", y=" .. tileY .. " 放置建筑，地形类型: " .. (terrain or "nil"))
+                
+                -- 检查是否在玩家防御区域外
+                if not player:canBuildAt(tileX, tileY) then
+                    print("无法在玩家防御区域内建造建筑")
+                    return
+                end
+                
+                -- 防止放置在水上（水的地形类型是2，参考config/terrain.lua）
+                if terrain and terrain ~= 2 then  -- TerrainConfig.TERRAIN_TYPES.WATER = 2
+                    -- 创建新建筑
+                    local buildingType = cardController.selectedCard.config.buildingType
+                    print("建筑类型: " .. (buildingType or "nil"))
+                    
+                    if buildingType then
+                        local building = Building:new(buildingType, tileX, tileY)
+                        
+                        -- 应用卡牌中的自定义属性到建筑
+                        if cardController.selectedCard.config.lifespan then
+                            building.attributes.lifespan = cardController.selectedCard.config.lifespan
+                            building.attributes.remainingTime = building.attributes.lifespan
+                        end
+                        
+                        if cardController.selectedCard.config.spawnRate then
+                            building.attributes.spawnRate = cardController.selectedCard.config.spawnRate
+                            building.status.timeToNextSpawn = building.attributes.spawnRate
+                        end
+                        
+                        -- 添加建筑到列表中
+                        table.insert(buildings, building)
+                        print("成功创建建筑，当前建筑数量: " .. #buildings)
+                        
+                        -- 使用卡牌
+                        cardController:removeCard(cardController.selectedCard)
+                    end
                 end
             end
         end
@@ -224,7 +278,20 @@ function love.mousepressed(x, y, button)
             
             if distance <= monster.config.size then
                 player:attack(monster)
-                break
+                return
+            end
+        end
+        
+        -- 检查是否点击了建筑（尝试攻击或拆除）
+        for _, building in ipairs(buildings) do
+            local dx = x - building.x
+            local dy = y - building.y
+            local distance = math.sqrt(dx * dx + dy * dy)
+            
+            if distance <= building.size * 1.5 then
+                -- 攻击建筑
+                building:takeDamage(player.attributes.attack)
+                return
             end
         end
     end
