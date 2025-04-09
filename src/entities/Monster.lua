@@ -44,11 +44,18 @@ function Monster:new(type, x, y)
         wanderTimer = 0,      -- 随机移动计时器
         wanderX = nil,        -- 随机移动目标X
         wanderY = nil,        -- 随机移动目标Y
-        state = "wander",     -- AI状态：wander（游荡）, chase（追击）, attack（攻击）
+        state = "idle",       -- AI状态：idle（空闲）, move（移动）, attack（攻击）
         homeBuilding = nil,   -- 怪物所属的建筑
         homeX = nil,          -- 出生地点X
         homeY = nil,          -- 出生地点Y
         wanderRadius = 80     -- 游荡半径，默认值
+    }
+    
+    -- 初始化动画
+    self.animations = {
+        idle = AnimationSystem.getMonsterAnimation(self.type, "idle"),
+        move = AnimationSystem.getMonsterAnimation(self.type, "move"),
+        attack = AnimationSystem.getMonsterAnimation(self.type, "attack")
     }
     
     initFont()
@@ -151,20 +158,6 @@ function Monster:moveTowards(target, dt)
 end
 
 function Monster:update(dt, map)
-    -- 更新动画
-    if self.animation then
-        self.animation:update(dt)
-    end
-    
-    -- 更新状态
-    if self.status.isAttacking then
-        self.status.state = "attack"
-    elseif self.status.isMoving then
-        self.status.state = "move"
-    else
-        self.status.state = "idle"
-    end
-    
     if self.status.isDead then return end
     
     -- 更新攻击状态
@@ -195,14 +188,23 @@ function Monster:update(dt, map)
             self:attack(self.status.target)
         else
             -- 向目标移动
-            self.status.state = "chase"
+            self.status.state = "move"
             self:moveTowards(self.status.target, dt)
         end
     else
         -- 直接向玩家位置移动
         if distanceToCenter > self.attributes.attackRange then
+            self.status.state = "move"
             self:moveTowards({x = centerX, y = centerY}, dt)
+        else
+            self.status.state = "idle"
         end
+    end
+    
+    -- 更新当前状态的动画
+    local currentAnimation = self.animations[self.status.state]
+    if currentAnimation then
+        currentAnimation:update(dt)
     end
 end
 
@@ -212,13 +214,13 @@ end
 
 function Monster:draw()
     -- 获取当前状态的动画
-    local animation = AnimationSystem.getMonsterAnimation(self.type, self.status.state)
+    local currentAnimation = self.animations[self.status.state]
     
-    if animation then
+    if currentAnimation then
         -- 设置颜色
         love.graphics.setColor(1, 1, 1)
         -- 绘制动画
-        animation:draw(resources.images[self.type], self.x, self.y, 0, 1, 1, 8, 8)
+        currentAnimation:draw(resources.images[self.type], self.x, self.y, 0, 1, 1, 8, 8)
     else
         -- 如果没有动画，使用默认绘制
         love.graphics.setColor(self.config.color[1], self.config.color[2], self.config.color[3])
