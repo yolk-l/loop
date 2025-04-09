@@ -5,6 +5,10 @@ Player.__index = Player
 -- 引入物品系统和地形配置
 local ItemSystem = require('src/systems/Item')
 local TerrainConfig = require('config/terrain')
+local AnimationSystem = require('src/systems/Animation')
+
+-- 获取动画系统资源
+local resources = AnimationSystem.getResources()
 
 -- 字体缓存
 local playerFont = nil
@@ -110,6 +114,11 @@ function Player:getSpeedModifier(x, y)
 end
 
 function Player:update(dt)
+    -- 更新动画
+    if self.animation then
+        self.animation:update(dt)
+    end
+    
     -- 玩家固定在地图中央，所以不再处理移动逻辑
     
     -- 更新攻击冷却
@@ -438,6 +447,25 @@ function Player:equip(item)
 end
 
 function Player:draw()
+    -- 获取当前状态的动画
+    local animation = nil
+    if self.status.isAttacking then
+        animation = AnimationSystem.getAnimation(AnimationSystem.TYPES.PLAYER_ATTACK)
+    else
+        animation = AnimationSystem.getAnimation(AnimationSystem.TYPES.PLAYER_IDLE)
+    end
+    
+    if animation then
+        -- 设置颜色
+        love.graphics.setColor(1, 1, 1)
+        -- 绘制动画
+        animation:draw(resources.images.player, self.x, self.y, 0, 1, 1, 8, 8)
+    else
+        -- 如果没有动画，使用默认绘制
+        love.graphics.setColor(0.2, 0.6, 1.0)
+        love.graphics.circle('fill', self.x, self.y, self.size)
+    end
+    
     -- 绘制防御区域（不可建造区域）
     love.graphics.setColor(0.8, 0.2, 0.2, 0.15)  -- 淡红色
     love.graphics.circle('fill', self.x, self.y, self.defenseRadius)
@@ -454,24 +482,16 @@ function Player:draw()
     love.graphics.setColor(0.2, 0.6, 0.8, 0.3)
     love.graphics.circle('line', self.x, self.y, self.attackRadius)
     
-    -- 绘制玩家
-    love.graphics.setColor(0.2, 0.6, 1.0)
-    love.graphics.circle('fill', self.x, self.y, self.size)
-    
-    -- 绘制边框
-    love.graphics.setColor(0.1, 0.3, 0.5)
-    love.graphics.circle('line', self.x, self.y, self.size)
-    
     -- 绘制生命条
     local hpBarWidth = self.size * 2
-    local hpBarHeight = 5
+    local hpBarHeight = 3
     local hpPercentage = self.attributes.hp / self.attributes.maxHp
     
     love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.size - 10, hpBarWidth, hpBarHeight)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.size - 5, hpBarWidth, hpBarHeight)
     
     love.graphics.setColor(1 - hpPercentage, hpPercentage, 0.2)
-    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.size - 10, hpBarWidth * hpPercentage, hpBarHeight)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.size - 5, hpBarWidth * hpPercentage, hpBarHeight)
     
     -- 绘制AI状态指示器
     if self.status.isAIControlled then

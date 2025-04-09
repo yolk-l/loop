@@ -5,6 +5,12 @@ Monster.__index = Monster
 -- 引入配置
 local MONSTER_CONFIG = require('config/monsters')
 
+-- 引入动画系统
+local AnimationSystem = require('src/systems/Animation')
+
+-- 获取动画系统资源
+local resources = AnimationSystem.getResources()
+
 -- 字体缓存
 local monsterFont = nil
 
@@ -27,7 +33,7 @@ function Monster:new(type, x, y)
     for k, v in pairs(self.config.attributes) do
         self.attributes[k] = v
     end
-    self.hp = self.attributes.maxHp
+    self.attributes.hp = self.attributes.maxHp  -- 初始化当前生命值
     
     -- 状态系统
     self.status = {
@@ -51,9 +57,9 @@ end
 
 function Monster:takeDamage(damage)
     local actualDamage = math.max(1, damage - self.attributes.defense)
-    self.hp = math.max(0, self.hp - actualDamage)
+    self.attributes.hp = math.max(0, self.attributes.hp - actualDamage)
     
-    if self.hp <= 0 then
+    if self.attributes.hp <= 0 then
         self.status.isDead = true
     end
     
@@ -145,6 +151,20 @@ function Monster:moveTowards(target, dt)
 end
 
 function Monster:update(dt, map)
+    -- 更新动画
+    if self.animation then
+        self.animation:update(dt)
+    end
+    
+    -- 更新状态
+    if self.status.isAttacking then
+        self.status.state = "attack"
+    elseif self.status.isMoving then
+        self.status.state = "move"
+    else
+        self.status.state = "idle"
+    end
+    
     if self.status.isDead then return end
     
     -- 更新攻击状态
@@ -191,31 +211,30 @@ function Monster:setTarget(target)
 end
 
 function Monster:draw()
-    if self.status.isDead then return end
+    -- 获取当前状态的动画
+    local animation = AnimationSystem.getMonsterAnimation(self.type, self.status.state)
     
-    -- 绘制怪物
-    love.graphics.setColor(unpack(self.config.color))
-    love.graphics.circle('fill', self.x, self.y, self.config.size)
-    
-    -- 绘制边框
-    love.graphics.setColor(0.3, 0.3, 0.3)
-    love.graphics.circle('line', self.x, self.y, self.config.size)
+    if animation then
+        -- 设置颜色
+        love.graphics.setColor(1, 1, 1)
+        -- 绘制动画
+        animation:draw(resources.images[self.type], self.x, self.y, 0, 1, 1, 8, 8)
+    else
+        -- 如果没有动画，使用默认绘制
+        love.graphics.setColor(self.config.color[1], self.config.color[2], self.config.color[3])
+        love.graphics.circle('fill', self.x, self.y, self.config.size)
+    end
     
     -- 绘制生命条
     local hpBarWidth = self.config.size * 2
-    local hpBarHeight = 5
-    local hpPercentage = self.hp / self.attributes.maxHp
+    local hpBarHeight = 3
+    local hpPercentage = self.attributes.hp / self.attributes.maxHp
     
     love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.config.size - 10, hpBarWidth, hpBarHeight)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.config.size - 5, hpBarWidth, hpBarHeight)
     
     love.graphics.setColor(1 - hpPercentage, hpPercentage, 0.2)
-    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.config.size - 10, hpBarWidth * hpPercentage, hpBarHeight)
-    
-    -- 绘制怪物名称
-    love.graphics.setFont(monsterFont)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.print(self.config.name, self.x - monsterFont:getWidth(self.config.name)/2, self.y - self.config.size - 25)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y - self.config.size - 5, hpBarWidth * hpPercentage, hpBarHeight)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)

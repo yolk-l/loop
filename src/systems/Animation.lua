@@ -99,4 +99,9 @@ end
 -- 导出动画类型常量
 AnimationSystem.TYPES = ANIMATION_TYPES
 
+-- 获取动画系统资源
+function AnimationSystem.getResources()
+    return resources
+end
+
 return AnimationSystem 
