@@ -90,6 +90,8 @@ function AnimationSystem.initialize()
     resources.images.slime = loadOrGenerateImage("assets/sprites/slime_sheet.png", "monster", 16, PixelSprites.COLORS.GREEN)
     resources.images.goblin = loadOrGenerateImage("assets/sprites/goblin_sheet.png", "monster", 16, PixelSprites.COLORS.ORANGE)
     resources.images.skeleton = loadOrGenerateImage("assets/sprites/skeleton_sheet.png", "monster", 16, PixelSprites.COLORS.GRAY)
+    resources.images.werewolf = loadOrGenerateImage("assets/sprites/werewolf_sheet.png", "monster", 16, PixelSprites.COLORS.PURPLE)
+    resources.images.zombie = loadOrGenerateImage("assets/sprites/zombie_sheet.png", "monster", 16, PixelSprites.COLORS.RED)
     
     -- 添加额外资源
     resources.images.building = loadOrGenerateImage("assets/sprites/building_sheet.png", "building", 32, PixelSprites.COLORS.BLUE)

@@ -4,6 +4,7 @@ Item.__index = Item
 
 -- 引入配置
 local ItemConfig = require('config/items')
+local Global = require('src/utils/global')
 
 -- 字体缓存
 local fonts = {
@@ -19,14 +20,14 @@ local function initFonts()
     end
 end
 
-function Item:new(itemType, id, x, y)
+function Item:new(itemId, x, y)
     local self = setmetatable({}, Item)
-    self.itemType = itemType
-    self.id = id
+    self.itemId = itemId
+    self.id = Global.gen_id()
     self.x = x
     self.y = y
     self.size = 15
-    self.config = ItemConfig.EQUIPMENT_CONFIG[id]
+    self.config = ItemConfig.EQUIPMENT_CONFIG[itemId]
     self.pickupRange = 30
     
     initFonts()
@@ -63,159 +64,36 @@ end
 function Item.generateDrops(monsterType, x, y)
     local drops = {}
     
-    -- 根据怪物类型生成不同掉落物
-    if monsterType == "slime" then
-        -- 10%几率掉落史莱姆巢穴卡牌
-        if math.random() < 0.1 then
-            local card = {
-                isCard = true,
-                buildingCardType = 1
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 5%几率掉落装备
-        if math.random() < 0.05 then
-            local item = Item:new("weapon", x, y)
-            table.insert(drops, item)
-        end
-    elseif monsterType == "goblin" then
-        -- 8%几率掉落哥布林小屋卡牌
-        if math.random() < 0.08 then
-            local card = {
-                isCard = true,
-                buildingCardType = 2
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 10%几率掉落装备
-        if math.random() < 0.1 then
-            local itemType = math.random(1, 2) == 1 and "weapon" or "armor"
-            local item = Item:new(itemType, x, y)
-            table.insert(drops, item)
-        end
-    elseif monsterType == "skeleton" then
-        -- 6%几率掉落骷髅墓地卡牌
-        if math.random() < 0.06 then
-            local card = {
-                isCard = true,
-                buildingCardType = 3
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 15%几率掉落装备
-        if math.random() < 0.15 then
-            local itemType = math.random(1, 3)
-            if itemType == 1 then
-                local item = Item:new("weapon", x, y)
-                table.insert(drops, item)
-            elseif itemType == 2 then
-                local item = Item:new("armor", x, y)
-                table.insert(drops, item)
-            else
-                local item = Item:new("accessory", x, y)
+    -- 获取怪物的掉落表配置
+    local dropConfig = ItemConfig.DROP_TABLE[monsterType]
+    
+    -- 如果没有为该怪物类型定义掉落表，返回空列表
+    if not dropConfig then
+        return drops
+    end
+    
+    -- 处理装备掉落
+    if dropConfig.equipment then
+        for _, equipData in ipairs(dropConfig.equipment) do
+            -- 根据概率判断是否掉落该装备
+            if math.random() < equipData.chance then
+                local item = Item:new(equipData.id, x, y)
                 table.insert(drops, item)
             end
         end
-    elseif monsterType == "zombie" then
-        -- 7%几率掉落僵尸墓园卡牌
-        if math.random() < 0.07 then
+    end
+    
+    -- 处理卡牌掉落
+    if dropConfig.cardChance and math.random() < dropConfig.cardChance then
+        -- 使用配置文件中的映射表获取建筑卡牌类型
+        local buildingCardType = ItemConfig.MONSTER_TO_CARD_TYPE[monsterType]
+        
+        if buildingCardType then
             local card = {
                 isCard = true,
-                buildingCardType = 4
+                buildingCardType = buildingCardType
             }
             table.insert(drops, card)
-        end
-        
-        -- 12%几率掉落装备
-        if math.random() < 0.12 then
-            local itemType = math.random(1, 2) == 1 and "armor" or "accessory"
-            local item = Item:new(itemType, x, y)
-            table.insert(drops, item)
-        end
-    elseif monsterType == "werewolf" then
-        -- 6%几率掉落狼人巢穴卡牌
-        if math.random() < 0.06 then
-            local card = {
-                isCard = true,
-                buildingCardType = 5
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 15%几率掉落高级装备
-        if math.random() < 0.15 then
-            local itemType = math.random(1, 3)
-            local item = Item:new(itemType == 1 and "weapon" or itemType == 2 and "armor" or "accessory", x, y)
-            item.rarity = math.random(1, 2) == 1 and "rare" or "uncommon"
-            table.insert(drops, item)
-        end
-    elseif monsterType == "ghost" then
-        -- 8%几率掉落幽灵庄园卡牌
-        if math.random() < 0.08 then
-            local card = {
-                isCard = true,
-                buildingCardType = 6
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 18%几率掉落幽灵专属装备
-        if math.random() < 0.18 then
-            local item = Item:new("accessory", x, y)
-            item.rarity = "rare"
-            table.insert(drops, item)
-        end
-    elseif monsterType == "golem" then
-        -- 5%几率掉落巨人熔炉卡牌
-        if math.random() < 0.05 then
-            local card = {
-                isCard = true,
-                buildingCardType = 7
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 25%几率掉落高级装备
-        if math.random() < 0.25 then
-            local item = Item:new("armor", x, y)
-            item.rarity = "rare"
-            table.insert(drops, item)
-        end
-    elseif monsterType == "witch" then
-        -- 6%几率掉落女巫小屋卡牌
-        if math.random() < 0.06 then
-            local card = {
-                isCard = true,
-                buildingCardType = 8
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 20%几率掉落魔法装备
-        if math.random() < 0.2 then
-            local item = Item:new(math.random(1, 2) == 1 and "weapon" or "accessory", x, y)
-            item.rarity = "rare"
-            table.insert(drops, item)
-        end
-    elseif monsterType == "dragon" then
-        -- 3%几率掉落龙之洞窟卡牌
-        if math.random() < 0.03 then
-            local card = {
-                isCard = true,
-                buildingCardType = 9
-            }
-            table.insert(drops, card)
-        end
-        
-        -- 40%几率掉落龙级装备
-        if math.random() < 0.4 then
-            local itemType = math.random(1, 3)
-            local item = Item:new(itemType == 1 and "weapon" or itemType == 2 and "armor" or "accessory", x, y)
-            item.rarity = "epic"
-            table.insert(drops, item)
         end
     end
     
