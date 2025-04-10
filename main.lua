@@ -8,7 +8,6 @@ local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
 local Timer = require('lib/timer')  -- 引入timer库
-local PixelSprites = require('src/utils/PixelSprites')  -- 引入精灵生成工具
 
 -- 游戏状态
 local player
@@ -24,8 +23,6 @@ local gameTimer  -- 全局计时器实例
 local attackEffects = {}  -- 攻击效果数组
 
 function love.load()
-    -- 生成像素精灵表
-    PixelSprites.generateSprites()
     
     -- 初始化动画系统
     local AnimationSystem = require('src/systems/Animation')

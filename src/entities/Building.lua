@@ -5,6 +5,9 @@ Building.__index = Building
 -- 引入怪物系统
 local Monster = require('src/entities/Monster')
 
+-- 引入动画系统
+local AnimationSystem = require('src/systems/Animation')
+
 -- 字体缓存
 local buildingFont = nil
 
@@ -20,7 +23,7 @@ function Building:new(type, x, y)
     self.type = type
     self.x = x
     self.y = y
-    self.size = 16  -- 建筑大小
+    self.size = 16  -- 建筑基础大小
     
     -- 初始化建筑属性
     self.attributes = {
@@ -39,25 +42,33 @@ function Building:new(type, x, y)
         self.color = {0.5, 0.8, 0.5}
         self.monsterType = "slime"
         self.name = "史莱姆巢穴"
+        self.spriteColor = {0.3, 0.8, 0.3}  -- 绿色
     elseif self.type == "goblin_hut" then
         self.color = {0.8, 0.5, 0.3}
         self.monsterType = "goblin"
         self.name = "哥布林小屋"
         self.attributes.spawnRate = 15
         self.attributes.maxSpawns = 3
+        self.spriteColor = {0.8, 0.5, 0.3}  -- 褐色
     elseif self.type == "skeleton_tomb" then
         self.color = {0.8, 0.8, 0.8}
         self.monsterType = "skeleton"
         self.name = "骷髅墓地"
         self.attributes.spawnRate = 20
         self.attributes.maxSpawns = 2
+        self.spriteColor = {0.6, 0.6, 0.7}  -- 灰色
     end
+    
+    -- 获取建筑精灵
+    self.sprite = AnimationSystem.getImage("building")
+    self.scale = 1.0  -- 精灵缩放
     
     -- 状态系统
     self.status = {
         timeToNextSpawn = self.attributes.spawnRate, -- 下次生成怪物的时间
         spawnedMonsters = {},                        -- 已生成的怪物列表
-        isDead = false                               -- 是否已经消失
+        isDead = false,                             -- 是否已经消失
+        animTime = 0                                -- 用于简单动画效果
     }
     
     initFont()
@@ -65,6 +76,9 @@ function Building:new(type, x, y)
 end
 
 function Building:update(dt, monsters)
+    -- 更新动画时间
+    self.status.animTime = self.status.animTime + dt
+    
     -- 更新剩余时间
     self.attributes.remainingTime = self.attributes.remainingTime - dt
     
@@ -122,19 +136,27 @@ function Building:takeDamage(damage)
 end
 
 function Building:draw()
-    -- 绘制建筑
-    love.graphics.setColor(unpack(self.color))
-    love.graphics.rectangle('fill', self.x - self.size, self.y - self.size, self.size * 2, self.size * 2)
+    -- 应用一个微小的偏移量，用于呼吸动画效果
+    local breathOffset = math.sin(self.status.animTime * 2) * 2
     
-    -- 绘制建筑边框
-    love.graphics.setColor(0.3, 0.3, 0.3)
-    love.graphics.rectangle('line', self.x - self.size, self.y - self.size, self.size * 2, self.size * 2)
+    -- 绘制建筑精灵
+    love.graphics.setColor(unpack(self.spriteColor or self.color))
+    love.graphics.draw(
+        self.sprite, 
+        self.x, 
+        self.y + breathOffset, 
+        0,                       -- 旋转角度
+        self.scale,              -- X缩放
+        self.scale,              -- Y缩放
+        self.sprite:getWidth()/2, -- 中心点X
+        self.sprite:getHeight()/2 -- 中心点Y
+    )
     
     -- 绘制建筑名称
     love.graphics.setFont(buildingFont)
     love.graphics.setColor(1, 1, 1)
     local textWidth = buildingFont:getWidth(self.name)
-    love.graphics.print(self.name, self.x - textWidth/2, self.y - self.size - 20)
+    love.graphics.print(self.name, self.x - textWidth/2, self.y - self.sprite:getHeight()/2 * self.scale - 20)
     
     -- 绘制生命条
     local hpBarWidth = self.size * 2
@@ -142,10 +164,10 @@ function Building:draw()
     local hpPercentage = self.attributes.hp / self.attributes.maxHp
     
     love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle('fill', self.x - self.size, self.y + self.size + 5, hpBarWidth, hpBarHeight)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y + self.sprite:getHeight()/2 * self.scale + 5, hpBarWidth, hpBarHeight)
     
     love.graphics.setColor(1 - hpPercentage, hpPercentage, 0.2)
-    love.graphics.rectangle('fill', self.x - self.size, self.y + self.size + 5, hpBarWidth * hpPercentage, hpBarHeight)
+    love.graphics.rectangle('fill', self.x - hpBarWidth/2, self.y + self.sprite:getHeight()/2 * self.scale + 5, hpBarWidth * hpPercentage, hpBarHeight)
     
     -- 绘制剩余时间条
     local timeBarWidth = self.size * 2
@@ -153,10 +175,25 @@ function Building:draw()
     local timePercentage = self.attributes.remainingTime / self.attributes.lifespan
     
     love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle('fill', self.x - self.size, self.y + self.size + 10, timeBarWidth, timeBarHeight)
+    love.graphics.rectangle('fill', self.x - timeBarWidth/2, self.y + self.sprite:getHeight()/2 * self.scale + 10, timeBarWidth, timeBarHeight)
     
     love.graphics.setColor(0.2, 0.6, 1.0)
-    love.graphics.rectangle('fill', self.x - self.size, self.y + self.size + 10, timeBarWidth * timePercentage, timeBarHeight)
+    love.graphics.rectangle('fill', self.x - timeBarWidth/2, self.y + self.sprite:getHeight()/2 * self.scale + 10, timeBarWidth * timePercentage, timeBarHeight)
+    
+    -- 如果建筑即将消失，添加闪烁效果
+    if self.attributes.remainingTime < 10 and math.floor(self.status.animTime * 4) % 2 == 0 then
+        love.graphics.setColor(1, 0.3, 0.3, 0.3)
+        love.graphics.draw(
+            self.sprite, 
+            self.x, 
+            self.y + breathOffset, 
+            0,                        -- 旋转角度
+            self.scale * 1.1,         -- X缩放（略大一些）
+            self.scale * 1.1,         -- Y缩放（略大一些）
+            self.sprite:getWidth()/2, -- 中心点X
+            self.sprite:getHeight()/2 -- 中心点Y
+        )
+    end
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)

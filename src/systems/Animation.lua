@@ -4,6 +4,9 @@ local AnimationSystem = {}
 -- 引入anim8库
 local anim8 = require('lib/anim8')
 
+-- 引入像素精灵生成器
+local PixelSprites = require('src/utils/PixelSprites')
+
 -- 存储游戏所有的资源图片、精灵表和动画
 local resources = {
     images = {},     -- 存储所有图片
@@ -24,13 +27,74 @@ local ANIMATION_TYPES = {
     MONSTER_SKELETON_ATTACK = "monster_skeleton_attack"
 }
 
+-- 确保资源目录存在
+local function ensureResourceDirectories()
+    love.filesystem.createDirectory("assets")
+    love.filesystem.createDirectory("assets/sprites")
+end
+
+-- 生成简单的单帧图像
+local function generateSimpleImage(type, size, color)
+    local image
+    if type == "monster" then
+        image = PixelSprites.generateMonsterSprite(size, color)
+    elseif type == "building" then
+        image = PixelSprites.generateBuildingSprite(size, color)
+    elseif type == "item" then
+        image = PixelSprites.generateItemSprite(size, color)
+    elseif type == "effect" then
+        image = PixelSprites.generateEffectSprite(size, color)
+    else -- 默认为玩家
+        -- 生成蓝色圆形玩家
+        local imageData = love.image.newImageData(size, size)
+        local center = size/2 - 0.5
+        local radius = size/3
+        
+        for y = 0, size - 1 do
+            for x = 0, size - 1 do
+                local dx = x - center
+                local dy = y - center
+                local distance = math.sqrt(dx*dx + dy*dy)
+                
+                if distance <= radius then
+                    imageData:setPixel(x, y, 0.2, 0.6, 1.0, 1) -- 蓝色
+                else
+                    imageData:setPixel(x, y, 0, 0, 0, 0) -- 透明
+                end
+            end
+        end
+        
+        image = love.graphics.newImage(imageData)
+    end
+    
+    return image
+end
+
+-- 尝试加载图像，如果不存在则生成临时图像
+local function loadOrGenerateImage(path, type, size, color)
+    if love.filesystem.getInfo(path) then
+        return love.graphics.newImage(path)
+    else
+        print("警告: 找不到图像 " .. path .. "，生成临时图像代替")
+        return generateSimpleImage(type, size or 16, color)
+    end
+end
+
 -- 初始化动画系统
 function AnimationSystem.initialize()
-    -- 加载所有精灵表
-    resources.images.player = love.graphics.newImage("assets/sprites/player_sheet.png")
-    resources.images.slime = love.graphics.newImage("assets/sprites/slime_sheet.png")
-    resources.images.goblin = love.graphics.newImage("assets/sprites/goblin_sheet.png")
-    resources.images.skeleton = love.graphics.newImage("assets/sprites/skeleton_sheet.png")
+    -- 确保资源目录存在
+    ensureResourceDirectories()
+    
+    -- 加载所有精灵表，如果不存在则生成简单版本
+    resources.images.player = loadOrGenerateImage("assets/sprites/player_sheet.png", "player", 16, PixelSprites.COLORS.BLUE)
+    resources.images.slime = loadOrGenerateImage("assets/sprites/slime_sheet.png", "monster", 16, PixelSprites.COLORS.GREEN)
+    resources.images.goblin = loadOrGenerateImage("assets/sprites/goblin_sheet.png", "monster", 16, PixelSprites.COLORS.ORANGE)
+    resources.images.skeleton = loadOrGenerateImage("assets/sprites/skeleton_sheet.png", "monster", 16, PixelSprites.COLORS.GRAY)
+    
+    -- 添加额外资源
+    resources.images.building = loadOrGenerateImage("assets/sprites/building_sheet.png", "building", 32, PixelSprites.COLORS.BLUE)
+    resources.images.item = loadOrGenerateImage("assets/sprites/item_sheet.png", "item", 8, PixelSprites.COLORS.YELLOW)
+    resources.images.effect = loadOrGenerateImage("assets/sprites/effect_sheet.png", "effect", 16, PixelSprites.COLORS.WHITE)
     
     -- 创建网格
     -- 玩家网格 (16x16像素每帧)
@@ -40,6 +104,11 @@ function AnimationSystem.initialize()
     resources.grids.slime = anim8.newGrid(16, 16, resources.images.slime:getWidth(), resources.images.slime:getHeight())
     resources.grids.goblin = anim8.newGrid(16, 16, resources.images.goblin:getWidth(), resources.images.goblin:getHeight())
     resources.grids.skeleton = anim8.newGrid(16, 16, resources.images.skeleton:getWidth(), resources.images.skeleton:getHeight())
+    
+    -- 额外网格
+    resources.grids.building = anim8.newGrid(32, 32, resources.images.building:getWidth(), resources.images.building:getHeight())
+    resources.grids.item = anim8.newGrid(8, 8, resources.images.item:getWidth(), resources.images.item:getHeight())
+    resources.grids.effect = anim8.newGrid(16, 16, resources.images.effect:getWidth(), resources.images.effect:getHeight())
     
     -- 创建动画
     -- 玩家动画
@@ -58,6 +127,28 @@ function AnimationSystem.initialize()
     resources.animations[ANIMATION_TYPES.MONSTER_SKELETON_IDLE] = anim8.newAnimation(resources.grids.skeleton('1-4', 1), 0.2)
     resources.animations[ANIMATION_TYPES.MONSTER_SKELETON_MOVE] = anim8.newAnimation(resources.grids.skeleton('1-4', 2), 0.15)
     resources.animations[ANIMATION_TYPES.MONSTER_SKELETON_ATTACK] = anim8.newAnimation(resources.grids.skeleton('1-4', 3), 0.1)
+end
+
+-- 获取单帧图像（适用于非动画对象，如建筑物、物品等）
+function AnimationSystem.getImage(type, customColor)
+    if type == "building" then
+        return resources.images.building
+    elseif type == "item" then
+        return resources.images.item
+    elseif type == "effect" then
+        return resources.images.effect
+    elseif type == "monster" then
+        -- 随机返回一个怪物图像
+        local monsters = {resources.images.slime, resources.images.goblin, resources.images.skeleton}
+        return monsters[math.random(1, #monsters)]
+    elseif type == "custom" then
+        -- 根据传入的自定义颜色生成图像
+        local size = 16
+        local color = customColor or PixelSprites.COLORS.WHITE
+        return generateSimpleImage("monster", size, color)
+    else
+        return resources.images.player
+    end
 end
 
 -- 获取动画实例（返回一个克隆，以便每个实体有自己的动画状态）

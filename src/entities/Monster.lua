@@ -8,6 +8,9 @@ local MONSTER_CONFIG = require('config/monsters')
 -- 引入动画系统
 local AnimationSystem = require('src/systems/Animation')
 
+-- 引入像素精灵生成器
+local PixelSprites = require('src/utils/PixelSprites')
+
 -- 获取动画系统资源
 local resources = AnimationSystem.getResources()
 
@@ -48,7 +51,10 @@ function Monster:new(type, x, y)
         homeBuilding = nil,   -- 怪物所属的建筑
         homeX = nil,          -- 出生地点X
         homeY = nil,          -- 出生地点Y
-        wanderRadius = 80     -- 游荡半径，默认值
+        wanderRadius = 80,    -- 游荡半径，默认值
+        animTime = 0,         -- 用于简单动画效果
+        directionX = 1,       -- 面向方向（1为右，-1为左）
+        bobOffset = 0         -- 上下移动偏移量
     }
     
     -- 初始化动画
@@ -57,6 +63,23 @@ function Monster:new(type, x, y)
         move = AnimationSystem.getMonsterAnimation(self.type, "move"),
         attack = AnimationSystem.getMonsterAnimation(self.type, "attack")
     }
+    
+    -- 创建像素精灵作为备用
+    if self.type == "slime" then
+        self.pixelSprite = PixelSprites.generateMonsterSprite(16, PixelSprites.COLORS.GREEN)
+    elseif self.type == "goblin" then
+        self.pixelSprite = PixelSprites.generateMonsterSprite(16, PixelSprites.COLORS.ORANGE)
+    elseif self.type == "skeleton" then
+        self.pixelSprite = PixelSprites.generateMonsterSprite(16, PixelSprites.COLORS.GRAY)
+    else
+        -- 默认随机颜色
+        local randomColor = {
+            math.random(0.5, 1.0),
+            math.random(0.5, 1.0),
+            math.random(0.5, 1.0)
+        }
+        self.pixelSprite = PixelSprites.generateMonsterSprite(16, randomColor)
+    end
     
     initFont()
     return self
@@ -83,6 +106,9 @@ function Monster:attack(target)
     local dx = target.x - self.x
     local dy = target.y - self.y
     local distance = math.sqrt(dx * dx + dy * dy)
+    
+    -- 设置面向方向
+    self.status.directionX = dx < 0 and -1 or 1
     
     if distance <= self.attributes.attackRange then
         self.status.isAttacking = true
@@ -150,6 +176,11 @@ function Monster:moveTowards(target, dt)
     local dy = targetY - self.y
     local distance = math.sqrt(dx * dx + dy * dy)
     
+    -- 设置面向方向
+    if dx ~= 0 then
+        self.status.directionX = dx < 0 and -1 or 1
+    end
+    
     if distance > 0 then
         local speed = self.attributes.speed * dt
         self.x = self.x + (dx / distance) * speed
@@ -159,6 +190,16 @@ end
 
 function Monster:update(dt, map)
     if self.status.isDead then return end
+    
+    -- 更新动画时间
+    self.status.animTime = self.status.animTime + dt
+    
+    -- 更新上下移动偏移量（用于像素精灵动画）
+    if self.status.state == "move" then
+        self.status.bobOffset = math.sin(self.status.animTime * 8) * 2
+    else
+        self.status.bobOffset = math.sin(self.status.animTime * 3) * 1
+    end
     
     -- 更新攻击状态
     if self.status.isAttacking then
@@ -216,15 +257,33 @@ function Monster:draw()
     -- 获取当前状态的动画
     local currentAnimation = self.animations[self.status.state]
     
-    if currentAnimation then
+    if currentAnimation and resources.images[self.type] then
         -- 设置颜色
         love.graphics.setColor(1, 1, 1)
         -- 绘制动画
         currentAnimation:draw(resources.images[self.type], self.x, self.y, 0, 1, 1, 8, 8)
     else
-        -- 如果没有动画，使用默认绘制
+        -- 使用像素精灵绘制
         love.graphics.setColor(self.config.color[1], self.config.color[2], self.config.color[3])
-        love.graphics.circle('fill', self.x, self.y, self.config.size)
+        
+        -- 添加攻击效果（缩放和颜色变化）
+        local scale = 1.0
+        if self.status.isAttacking then
+            scale = 1.2
+            love.graphics.setColor(1, 0.7, 0.7)
+        end
+        
+        -- 绘制像素精灵，应用面向方向和上下移动效果
+        love.graphics.draw(
+            self.pixelSprite,
+            self.x,
+            self.y + self.status.bobOffset,
+            0,                           -- 旋转
+            scale * self.status.directionX, -- X缩放（处理朝向）
+            scale,                       -- Y缩放
+            self.pixelSprite:getWidth()/2,  -- 中心X
+            self.pixelSprite:getHeight()/2  -- 中心Y
+        )
     end
     
     -- 绘制生命条
