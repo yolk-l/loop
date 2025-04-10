@@ -21,10 +21,24 @@ local function initFonts()
     end
 end
 
-function Card:new(cardType)
+function Card:new(cardOrType)
     local self = setmetatable({}, Card)
-    self.type = cardType
-    self.config = CardConfig.CARD_CONFIG[cardType]
+    
+    -- 检查参数是否为table，支持直接传入配置
+    if type(cardOrType) == "table" then
+        self.config = cardOrType
+        self.type = cardOrType.type or 1  -- 默认类型为1
+        
+        -- 确保config中包含必要的属性
+        if not self.config.color then
+            self.config.color = {0.8, 0.8, 0.8}  -- 默认颜色
+        end
+    else
+        -- 按照原来的方式，通过cardType查找配置
+        self.type = cardOrType
+        self.config = CardConfig.CARD_CONFIG[cardOrType]
+    end
+    
     self.width = 100
     self.height = 150
     self.selected = false
@@ -33,6 +47,20 @@ function Card:new(cardType)
 end
 
 function Card:draw(x, y)
+    -- 检查config是否存在
+    if not self.config then
+        -- 如果config为nil，绘制错误信息
+        love.graphics.setColor(0.8, 0.2, 0.2)
+        love.graphics.rectangle('fill', x, y, self.width, self.height)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(fonts.title)
+        love.graphics.print("配置错误!", x + 10, y + 10)
+        love.graphics.setFont(fonts.description)
+        love.graphics.print("卡牌类型: " .. (self.type or "未知"), x + 10, y + 40)
+        love.graphics.setColor(1, 1, 1)
+        return
+    end
+    
     -- 绘制卡牌背景
     if self.selected then
         love.graphics.setColor(0.9, 0.9, 0.9)
@@ -56,13 +84,9 @@ function Card:draw(x, y)
     love.graphics.setFont(fonts.title)
     love.graphics.print(self.config.name, x + 10, y + 10)
     
-    -- 使用普通字体绘制消耗
-    love.graphics.setFont(fonts.normal)
-    love.graphics.print("消耗: " .. self.config.cost, x + 10, y + 40)
-    
     -- 使用描述字体绘制描述文字
     love.graphics.setFont(fonts.description)
-    love.graphics.printf(self.config.description, x + 5, y + 70, self.width - 10)
+    love.graphics.printf(self.config.description, x + 5, y + 50, self.width - 10)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)

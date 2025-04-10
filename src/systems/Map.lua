@@ -70,9 +70,9 @@ end
 
 function Map:new()
     local self = setmetatable({}, Map)
-    self.tileSize = 20  -- 从30减小到20
-    self.gridWidth = 40  -- 从26增加到40
-    self.gridHeight = 30 -- 从20增加到30
+    self.tileSize = 20  -- 每个格子的大小
+    self.gridWidth = 40  -- 地图宽度 40*20=800 像素
+    self.gridHeight = 30 -- 地图高度，留出底部空间给手牌
     
     -- 初始化随机数生成器
     math.randomseed(os.time())

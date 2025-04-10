@@ -9,7 +9,7 @@ local Monster = require('src/entities/Monster')
 local AnimationSystem = require('src/systems/Animation')
 
 -- 引入建筑配置
-local BuildingConfig = require('src/config/buildings')
+local BuildingConfig = require('config/buildings')
 
 -- 字体缓存
 local buildingFont = nil

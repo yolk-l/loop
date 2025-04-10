@@ -30,11 +30,12 @@ function love.load()
     local AnimationSystem = require('src/systems/Animation')
     AnimationSystem.initialize()
     
-    -- 使用默认字体
-    gameFont = love.graphics.getFont()
+    -- 使用中文字体
+    gameFont = love.graphics.newFont("assets/fonts/simsun.ttc", 14)
+    love.graphics.setFont(gameFont)
     
     -- 设置窗口大小
-    love.window.setMode(900, 800)
+    love.window.setMode(800, 700)
     
     -- 初始化计时器
     gameTimer = Timer.new()
@@ -59,7 +60,7 @@ function love.load()
     
     -- 初始化手牌
     for i = 1, 3 do
-        local cardType = math.random(1, 3)
+        local cardType = math.random(1, 9)  -- 改为1-9，包含所有9种建筑卡牌
         cardController:addCard(cardType)
     end
 end
@@ -192,7 +193,7 @@ function love.draw()
         
         -- 游戏结束文字
         love.graphics.setColor(1, 0.3, 0.3)
-        local font = love.graphics.newFont(36)
+        local font = love.graphics.newFont("assets/fonts/simsun.ttc", 36)
         love.graphics.setFont(font)
         local text = "游戏结束"
         local textWidth = font:getWidth(text)
@@ -200,7 +201,7 @@ function love.draw()
         
         -- 统计信息
         love.graphics.setColor(1, 1, 1)
-        font = love.graphics.newFont(20)
+        font = love.graphics.newFont("assets/fonts/simsun.ttc", 20)
         love.graphics.setFont(font)
         local statsText = string.format("等级: %d", player.attributes.level)
         textWidth = font:getWidth(statsText)
@@ -208,7 +209,7 @@ function love.draw()
         
         -- 重新开始提示
         love.graphics.setColor(0.8, 0.8, 0.8)
-        font = love.graphics.newFont(16)
+        font = love.graphics.newFont("assets/fonts/simsun.ttc", 16)
         love.graphics.setFont(font)
         local restartText = "按 R 键重新开始"
         textWidth = font:getWidth(restartText)
@@ -391,7 +392,7 @@ function love.keypressed(key)
             -- 重新初始化卡牌
             cardController = CardController:new()
             for i = 1, 3 do
-                local cardType = math.random(1, 3)
+                local cardType = math.random(1, 9)  -- 改为1-9，包含所有9种建筑卡牌
                 cardController:addCard(cardType)
             end
             
@@ -410,7 +411,7 @@ function love.keypressed(key)
         player:setAIControl(not player.status.isAIControlled)
     elseif key == 'd' then
         -- 抽一张牌
-        local cardType = math.random(1, 3)
+        local cardType = math.random(1, 9)  -- 改为1-9，包含所有9种建筑卡牌
         cardController:addCard(cardType)
     end
 end 

@@ -3,7 +3,7 @@ local Monster = {}
 Monster.__index = Monster
 
 -- 引入配置
-local MONSTER_CONFIG = require('src/config/monsters')
+local MONSTER_CONFIG = require('config/monsters')
 
 -- 引入动画系统
 local AnimationSystem = require('src/systems/Animation')
