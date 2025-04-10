@@ -21,6 +21,8 @@ local characterUI
 local gameFont
 local gameTimer  -- 全局计时器实例
 local attackEffects = {}  -- 攻击效果数组
+local gameOver = false
+local gameOverTime = 0
 
 function love.load()
     
@@ -65,6 +67,16 @@ end
 function love.update(dt)
     -- 更新计时器
     gameTimer:update(dt)
+    
+    -- 检查玩家是否死亡
+    if player.attributes.hp <= 0 then
+        -- 玩家已死亡，游戏结束
+        if not gameOver then
+            gameOver = true
+            gameOverTime = love.timer.getTime()
+        end
+        return  -- 停止其他更新
+    end
     
     -- 更新游戏逻辑
     player:update(dt)
@@ -170,6 +182,40 @@ function love.draw()
     -- 在最上层绘制物品提示（如果有）
     if characterUI.visible and inventoryController and inventoryController.view.selectedItemInfo then
         inventoryController.view:drawItemTooltip()
+    end
+    
+    -- 游戏结束界面
+    if gameOver then
+        -- 半透明黑色背景
+        love.graphics.setColor(0, 0, 0, 0.7)
+        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+        
+        -- 游戏结束文字
+        love.graphics.setColor(1, 0.3, 0.3)
+        local font = love.graphics.newFont(36)
+        love.graphics.setFont(font)
+        local text = "游戏结束"
+        local textWidth = font:getWidth(text)
+        love.graphics.print(text, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 - 50)
+        
+        -- 统计信息
+        love.graphics.setColor(1, 1, 1)
+        font = love.graphics.newFont(20)
+        love.graphics.setFont(font)
+        local statsText = string.format("等级: %d", player.attributes.level)
+        textWidth = font:getWidth(statsText)
+        love.graphics.print(statsText, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 + 10)
+        
+        -- 重新开始提示
+        love.graphics.setColor(0.8, 0.8, 0.8)
+        font = love.graphics.newFont(16)
+        love.graphics.setFont(font)
+        local restartText = "按 R 键重新开始"
+        textWidth = font:getWidth(restartText)
+        love.graphics.print(restartText, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 + 60)
+        
+        -- 恢复默认字体
+        love.graphics.setFont(gameFont)
     end
     
     -- 重置颜色
@@ -328,7 +374,36 @@ function love.keypressed(key)
         -- 同时切换背包和角色界面的可见性
         characterUI:toggleVisibility()
     elseif key == 'r' then
-        -- 重新生成地图
+        -- 如果游戏结束，按R键重新开始
+        if gameOver then
+            -- 重新初始化游戏
+            gameOver = false
+            monsters = {}
+            buildings = {}
+            items = {}
+            
+            -- 重新初始化玩家
+            player = Player:new(0, 0)
+            player:setMap(map)
+            player:setTimer(gameTimer)
+            player:setAttackEffects(attackEffects)
+            
+            -- 重新初始化卡牌
+            cardController = CardController:new()
+            for i = 1, 3 do
+                local cardType = math.random(1, 3)
+                cardController:addCard(cardType)
+            end
+            
+            -- 重新初始化背包
+            inventoryController = InventoryController:new()
+            
+            -- 重新生成地图
+            map:generate()
+            return
+        end
+        
+        -- 在游戏中按R重新生成地图
         map:generate()
     elseif key == 'a' then
         -- 切换AI控制

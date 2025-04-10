@@ -8,6 +8,9 @@ local Monster = require('src/entities/Monster')
 -- 引入动画系统
 local AnimationSystem = require('src/systems/Animation')
 
+-- 引入建筑配置
+local BuildingConfig = require('src/config/buildings')
+
 -- 字体缓存
 local buildingFont = nil
 
@@ -25,39 +28,26 @@ function Building:new(type, x, y)
     self.y = y
     self.size = 16  -- 建筑基础大小
     
+    -- 从配置文件获取建筑类型配置
+    local config = BuildingConfig.get(type)
+    
+    -- 设置基本属性
+    self.name = config.name
+    self.color = config.color
+    self.monsterType = config.monsterType
+    self.spriteColor = config.spriteColor
+    
     -- 初始化建筑属性
     self.attributes = {
-        hp = 100,               -- 建筑生命值
-        maxHp = 100,            -- 最大生命值
-        lifespan = 60,          -- 建筑存在时间（秒）
-        remainingTime = 60,     -- 剩余时间
-        spawnRate = 10,         -- 怪物生成速率（秒/只）
-        spawnRadius = 30,       -- 生成怪物的半径范围
-        maxSpawns = 5,          -- 最大同时存在的怪物数量
-        wanderRadius = 80       -- 怪物游荡半径
+        hp = config.attributes.hp,
+        maxHp = config.attributes.maxHp,
+        lifespan = config.attributes.lifespan,
+        remainingTime = config.attributes.lifespan,
+        spawnRate = config.attributes.spawnRate,
+        spawnRadius = config.attributes.spawnRadius,
+        maxSpawns = config.attributes.maxSpawns,
+        wanderRadius = config.attributes.wanderRadius
     }
-    
-    -- 根据建筑类型调整属性
-    if self.type == "slime_nest" then
-        self.color = {0.5, 0.8, 0.5}
-        self.monsterType = "slime"
-        self.name = "史莱姆巢穴"
-        self.spriteColor = {0.3, 0.8, 0.3}  -- 绿色
-    elseif self.type == "goblin_hut" then
-        self.color = {0.8, 0.5, 0.3}
-        self.monsterType = "goblin"
-        self.name = "哥布林小屋"
-        self.attributes.spawnRate = 15
-        self.attributes.maxSpawns = 3
-        self.spriteColor = {0.8, 0.5, 0.3}  -- 褐色
-    elseif self.type == "skeleton_tomb" then
-        self.color = {0.8, 0.8, 0.8}
-        self.monsterType = "skeleton"
-        self.name = "骷髅墓地"
-        self.attributes.spawnRate = 20
-        self.attributes.maxSpawns = 2
-        self.spriteColor = {0.6, 0.6, 0.7}  -- 灰色
-    end
     
     -- 获取建筑精灵
     self.sprite = AnimationSystem.getImage("building")
@@ -115,7 +105,7 @@ function Building:spawnMonster(globalMonsters)
     -- 创建新怪物实例
     local monster = Monster:new(self.monsterType, spawnX, spawnY)
     
-    -- 设置怪物的归属建筑，但不限制其游荡范围
+    -- 设置怪物的归属建筑
     monster.status.homeBuilding = self
     
     -- 将怪物添加到全局怪物列表和建筑的怪物列表

@@ -3,7 +3,7 @@ local Monster = {}
 Monster.__index = Monster
 
 -- 引入配置
-local MONSTER_CONFIG = require('config/monsters')
+local MONSTER_CONFIG = require('src/config/monsters')
 
 -- 引入动画系统
 local AnimationSystem = require('src/systems/Animation')
@@ -44,14 +44,8 @@ function Monster:new(type, x, y)
         lastAttackTime = 0,
         target = nil,
         isDead = false,
-        wanderTimer = 0,      -- 随机移动计时器
-        wanderX = nil,        -- 随机移动目标X
-        wanderY = nil,        -- 随机移动目标Y
         state = "idle",       -- AI状态：idle（空闲）, move（移动）, attack（攻击）
         homeBuilding = nil,   -- 怪物所属的建筑
-        homeX = nil,          -- 出生地点X
-        homeY = nil,          -- 出生地点Y
-        wanderRadius = 80,    -- 游荡半径，默认值
         animTime = 0,         -- 用于简单动画效果
         directionX = 1,       -- 面向方向（1为右，-1为左）
         bobOffset = 0         -- 上下移动偏移量
@@ -113,64 +107,20 @@ function Monster:attack(target)
     if distance <= self.attributes.attackRange then
         self.status.isAttacking = true
         self.status.lastAttackTime = currentTime
-        return target:takeDamage(self.attributes.attack)
+        
+        -- 对目标造成伤害
+        local damage = self.attributes.attack
+        return target:takeDamage(damage)
     end
     
     return false
-end
-
-function Monster:selectNewWanderTarget(map)
-    -- 如果有所属建筑，则限制在建筑周围游荡
-    if self.status.homeX and self.status.homeY then
-        local attempts = 0
-        local maxAttempts = 10
-        local angle, distance, targetX, targetY
-        
-        repeat
-            angle = math.random() * math.pi * 2
-            distance = math.random(10, self.status.wanderRadius)
-            targetX = self.status.homeX + math.cos(angle) * distance
-            targetY = self.status.homeY + math.sin(angle) * distance
-            
-            -- 确保目标点在地图范围内
-            targetX = math.max(50, math.min(map.gridWidth * map.tileSize - 50, targetX))
-            targetY = math.max(50, math.min(map.gridHeight * map.tileSize - 50, targetY))
-            
-            attempts = attempts + 1
-        until attempts >= maxAttempts
-        
-        self.status.wanderX = targetX
-        self.status.wanderY = targetY
-    else
-        -- 在地图范围内选择一个随机目标点
-        local mapWidth = map.gridWidth * map.tileSize
-        local mapHeight = map.gridHeight * map.tileSize
-        
-        local attempts = 0
-        local maxAttempts = 10
-        
-        repeat
-            self.status.wanderX = math.random(50, mapWidth - 50)
-            self.status.wanderY = math.random(50, mapHeight - 50)
-            attempts = attempts + 1
-        until attempts >= maxAttempts
-    end
-    
-    self.status.wanderTimer = math.random(3, 6)  -- 3-6秒后重新选择目标
-end
-
-function Monster:reachedTarget(targetX, targetY)
-    local dx = targetX - self.x
-    local dy = targetY - self.y
-    local distance = math.sqrt(dx * dx + dy * dy)
-    return distance < 10  -- 当距离小于10像素时认为已到达
 end
 
 function Monster:moveTowards(target, dt)
     if not target then return end
     
     local targetX = type(target) == "table" and target.x or target
-    local targetY = type(target) == "table" and target.y or self.status.wanderY
+    local targetY = type(target) == "table" and target.y or target
     
     local dx = targetX - self.x
     local dy = targetY - self.y
@@ -212,13 +162,9 @@ function Monster:update(dt, map)
     local centerX = map.gridWidth * map.tileSize / 2
     local centerY = map.gridHeight * map.tileSize / 2
     
-    -- 计算与玩家的距离
-    local dx = centerX - self.x
-    local dy = centerY - self.y
-    local distanceToCenter = math.sqrt(dx * dx + dy * dy)
-    
     -- 根据状态执行不同的行为
     if self.status.target then
+        -- 有玩家目标时的行为
         local dx = self.status.target.x - self.x
         local dy = self.status.target.y - self.y
         local distance = math.sqrt(dx * dx + dy * dy)
@@ -233,7 +179,11 @@ function Monster:update(dt, map)
             self:moveTowards(self.status.target, dt)
         end
     else
-        -- 直接向玩家位置移动
+        -- 没有玩家目标时，向地图中心（玩家位置）移动
+        local dx = centerX - self.x
+        local dy = centerY - self.y
+        local distanceToCenter = math.sqrt(dx * dx + dy * dy)
+        
         if distanceToCenter > self.attributes.attackRange then
             self.status.state = "move"
             self:moveTowards({x = centerX, y = centerY}, dt)
