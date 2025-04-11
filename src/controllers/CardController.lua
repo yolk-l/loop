@@ -36,7 +36,7 @@ local cardTypes = {
     {
         name = "狼人巢穴",
         description = "生成一个狼人巢穴，会持续生成狼人",
-        buildingType = "werewolf_den",
+        buildingType = "wolf_den",
         color = {0.6, 0.3, 0.1}
     },
     {

@@ -69,10 +69,10 @@ BuildingConfig.types = {
         }
     },
     
-    werewolf_den = {
+    wolf_den = {
         name = "狼人巢穴",
         color = {0.6, 0.3, 0.1},
-        monsterType = "werewolf",
+        monsterType = "wolf",
         spriteColor = {0.5, 0.25, 0.1},  -- 棕色
         attributes = {
             hp = 130,

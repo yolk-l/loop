@@ -24,13 +24,34 @@ local ANIMATION_TYPES = {
     MONSTER_GOBLIN_MOVE = "monster_goblin_move",
     MONSTER_SKELETON_IDLE = "monster_skeleton_idle",
     MONSTER_SKELETON_MOVE = "monster_skeleton_move",
-    MONSTER_SKELETON_ATTACK = "monster_skeleton_attack"
+    MONSTER_SKELETON_ATTACK = "monster_skeleton_attack",
+    MONSTER_ZOMBIE_IDLE = "monster_zombie_idle",
+    MONSTER_ZOMBIE_MOVE = "monster_zombie_move",
+    MONSTER_ZOMBIE_ATTACK = "monster_zombie_attack",
+    MONSTER_WOLF_IDLE = "monster_wolf_idle",
+    MONSTER_WOLF_MOVE = "monster_wolf_move",
+    MONSTER_WOLF_ATTACK = "monster_wolf_attack",
+    MONSTER_WITCH_IDLE = "monster_witch_idle",
+    MONSTER_WITCH_MOVE = "monster_witch_move",
+    MONSTER_WITCH_ATTACK = "monster_witch_attack",
+    MONSTER_GHOST_IDLE = "monster_ghost_idle",
+    MONSTER_GHOST_MOVE = "monster_ghost_move",
+    MONSTER_GHOST_ATTACK = "monster_ghost_attack",
+    MONSTER_GOLEM_IDLE = "monster_golem_idle",
+    MONSTER_GOLEM_MOVE = "monster_golem_move",
+    MONSTER_GOLEM_ATTACK = "monster_golem_attack",
+    MONSTER_DRAGON_IDLE = "monster_dragon_idle",
+    MONSTER_DRAGON_MOVE = "monster_dragon_move",
+    MONSTER_DRAGON_ATTACK = "monster_dragon_attack"
 }
 
 -- 确保资源目录存在
 local function ensureResourceDirectories()
     love.filesystem.createDirectory("assets")
     love.filesystem.createDirectory("assets/sprites")
+    love.filesystem.createDirectory("assets/sprites/player")
+    love.filesystem.createDirectory("assets/sprites/monsters")
+    love.filesystem.createDirectory("assets/sprites/equipments")
 end
 
 -- 生成简单的单帧图像
@@ -86,16 +107,20 @@ function AnimationSystem.initialize()
     ensureResourceDirectories()
     
     -- 加载所有精灵表，如果不存在则生成简单版本
-    resources.images.player = loadOrGenerateImage("assets/sprites/player_sheet.png", "player", 16, PixelSprites.COLORS.BLUE)
-    resources.images.slime = loadOrGenerateImage("assets/sprites/slime_sheet.png", "monster", 16, PixelSprites.COLORS.GREEN)
-    resources.images.goblin = loadOrGenerateImage("assets/sprites/goblin_sheet.png", "monster", 16, PixelSprites.COLORS.ORANGE)
-    resources.images.skeleton = loadOrGenerateImage("assets/sprites/skeleton_sheet.png", "monster", 16, PixelSprites.COLORS.GRAY)
-    resources.images.werewolf = loadOrGenerateImage("assets/sprites/werewolf_sheet.png", "monster", 16, PixelSprites.COLORS.PURPLE)
-    resources.images.zombie = loadOrGenerateImage("assets/sprites/zombie_sheet.png", "monster", 16, PixelSprites.COLORS.RED)
+    resources.images.player = loadOrGenerateImage("assets/sprites/player/player_sheet.png", "player", 16, PixelSprites.COLORS.BLUE)
+    resources.images.slime = loadOrGenerateImage("assets/sprites/monsters/slime_sheet.png", "monster", 16, PixelSprites.COLORS.GREEN)
+    resources.images.goblin = loadOrGenerateImage("assets/sprites/monsters/goblin_sheet.png", "monster", 16, PixelSprites.COLORS.ORANGE)
+    resources.images.skeleton = loadOrGenerateImage("assets/sprites/monsters/skeleton_sheet.png", "monster", 16, PixelSprites.COLORS.GRAY)
+    resources.images.wolf = loadOrGenerateImage("assets/sprites/monsters/wolf_sheet.png", "monster", 16, PixelSprites.COLORS.PURPLE)
+    resources.images.zombie = loadOrGenerateImage("assets/sprites/monsters/zombie_sheet.png", "monster", 16, PixelSprites.COLORS.RED)
+    resources.images.witch = loadOrGenerateImage("assets/sprites/monsters/witch_sheet.png", "monster", 16, PixelSprites.COLORS.YELLOW)
+    resources.images.ghost = loadOrGenerateImage("assets/sprites/monsters/ghost_sheet.png", "monster", 16, PixelSprites.COLORS.GRAY)
+    resources.images.golem = loadOrGenerateImage("assets/sprites/monsters/golem_sheet.png", "monster", 16, PixelSprites.COLORS.GRAY)
+    resources.images.dragon = loadOrGenerateImage("assets/sprites/monsters/dragon_sheet.png", "monster", 16, PixelSprites.COLORS.RED)
     
     -- 添加额外资源
     resources.images.building = loadOrGenerateImage("assets/sprites/building_sheet.png", "building", 32, PixelSprites.COLORS.BLUE)
-    resources.images.item = loadOrGenerateImage("assets/sprites/item_sheet.png", "item", 8, PixelSprites.COLORS.YELLOW)
+    resources.images.item = loadOrGenerateImage("assets/sprites/equipments/item_sheet.png", "item", 8, PixelSprites.COLORS.YELLOW)
     resources.images.effect = loadOrGenerateImage("assets/sprites/effect_sheet.png", "effect", 16, PixelSprites.COLORS.WHITE)
     
     -- 创建网格
@@ -106,6 +131,12 @@ function AnimationSystem.initialize()
     resources.grids.slime = anim8.newGrid(16, 16, resources.images.slime:getWidth(), resources.images.slime:getHeight())
     resources.grids.goblin = anim8.newGrid(16, 16, resources.images.goblin:getWidth(), resources.images.goblin:getHeight())
     resources.grids.skeleton = anim8.newGrid(16, 16, resources.images.skeleton:getWidth(), resources.images.skeleton:getHeight())
+    resources.grids.wolf = anim8.newGrid(16, 16, resources.images.wolf:getWidth(), resources.images.wolf:getHeight())
+    resources.grids.zombie = anim8.newGrid(16, 16, resources.images.zombie:getWidth(), resources.images.zombie:getHeight())
+    resources.grids.witch = anim8.newGrid(16, 16, resources.images.witch:getWidth(), resources.images.witch:getHeight())
+    resources.grids.ghost = anim8.newGrid(16, 16, resources.images.ghost:getWidth(), resources.images.ghost:getHeight())
+    resources.grids.golem = anim8.newGrid(16, 16, resources.images.golem:getWidth(), resources.images.golem:getHeight())
+    resources.grids.dragon = anim8.newGrid(16, 16, resources.images.dragon:getWidth(), resources.images.dragon:getHeight())
     
     -- 额外网格
     resources.grids.building = anim8.newGrid(32, 32, resources.images.building:getWidth(), resources.images.building:getHeight())
@@ -129,6 +160,34 @@ function AnimationSystem.initialize()
     resources.animations[ANIMATION_TYPES.MONSTER_SKELETON_IDLE] = anim8.newAnimation(resources.grids.skeleton('1-4', 1), 0.2)
     resources.animations[ANIMATION_TYPES.MONSTER_SKELETON_MOVE] = anim8.newAnimation(resources.grids.skeleton('1-4', 2), 0.15)
     resources.animations[ANIMATION_TYPES.MONSTER_SKELETON_ATTACK] = anim8.newAnimation(resources.grids.skeleton('1-4', 3), 0.1)
+    
+    -- 女巫动画
+    resources.animations[ANIMATION_TYPES.MONSTER_WITCH_IDLE] = anim8.newAnimation(resources.grids.witch('1-4', 1), 0.2)
+    resources.animations[ANIMATION_TYPES.MONSTER_WITCH_MOVE] = anim8.newAnimation(resources.grids.witch('1-4', 2), 0.15)
+    resources.animations[ANIMATION_TYPES.MONSTER_WITCH_ATTACK] = anim8.newAnimation(resources.grids.witch('1-4', 3), 0.1)
+
+    -- 狼人动画
+    resources.animations[ANIMATION_TYPES.MONSTER_WOLF_IDLE] = anim8.newAnimation(resources.grids.wolf('1-4', 1), 0.2)
+    resources.animations[ANIMATION_TYPES.MONSTER_WOLF_MOVE] = anim8.newAnimation(resources.grids.wolf('1-4', 2), 0.15)
+    resources.animations[ANIMATION_TYPES.MONSTER_WOLF_ATTACK] = anim8.newAnimation(resources.grids.wolf('1-4', 3), 0.1)
+
+    -- 僵尸动画
+    resources.animations[ANIMATION_TYPES.MONSTER_ZOMBIE_IDLE] = anim8.newAnimation(resources.grids.zombie('1-4', 1), 0.2)
+    resources.animations[ANIMATION_TYPES.MONSTER_ZOMBIE_MOVE] = anim8.newAnimation(resources.grids.zombie('1-4', 2), 0.15)
+    resources.animations[ANIMATION_TYPES.MONSTER_ZOMBIE_ATTACK] = anim8.newAnimation(resources.grids.zombie('1-4', 3), 0.1)
+
+    -- 石头巨人动画
+    resources.animations[ANIMATION_TYPES.MONSTER_GOLEM_IDLE] = anim8.newAnimation(resources.grids.golem('1-4', 1), 0.2)
+    resources.animations[ANIMATION_TYPES.MONSTER_GOLEM_MOVE] = anim8.newAnimation(resources.grids.golem('1-4', 2), 0.15)
+    resources.animations[ANIMATION_TYPES.MONSTER_GOLEM_ATTACK] = anim8.newAnimation(resources.grids.golem('1-4', 3), 0.1)
+    
+
+    -- 龙动画
+    resources.animations[ANIMATION_TYPES.MONSTER_DRAGON_IDLE] = anim8.newAnimation(resources.grids.dragon('1-4', 1), 0.2)
+    resources.animations[ANIMATION_TYPES.MONSTER_DRAGON_MOVE] = anim8.newAnimation(resources.grids.dragon('1-4', 2), 0.15)
+    resources.animations[ANIMATION_TYPES.MONSTER_DRAGON_ATTACK] = anim8.newAnimation(resources.grids.dragon('1-4', 3), 0.1)
+    
+
 end
 
 -- 获取单帧图像（适用于非动画对象，如建筑物、物品等）
@@ -163,29 +222,17 @@ end
 
 -- 根据怪物类型获取对应的动画
 function AnimationSystem.getMonsterAnimation(monsterType, state)
-    if monsterType == "slime" then
-        if state == "idle" or state == "attack" then
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_SLIME_IDLE)
-        else
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_SLIME_MOVE)
-        end
-    elseif monsterType == "goblin" then
-        if state == "idle" then
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_GOBLIN_IDLE)
-        else
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_GOBLIN_MOVE)
-        end
-    elseif monsterType == "skeleton" then
-        if state == "idle" then
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_SKELETON_IDLE)
-        elseif state == "attack" then
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_SKELETON_ATTACK)
-        else
-            return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_SKELETON_MOVE)
-        end
+    -- 获取怪物配置
+    local monsterConfig = require('config/monsters')
+    
+    -- 检查该怪物是否存在配置
+    if monsterConfig[monsterType] and monsterConfig[monsterType].animations and monsterConfig[monsterType].animations[state] then
+        -- 从配置中获取动画类型
+        local animationType = monsterConfig[monsterType].animations[state]
+        return AnimationSystem.getAnimation(animationType)
     end
     
-    -- 默认返回史莱姆动画
+    -- 如果没有找到对应配置，使用默认动画
     return AnimationSystem.getAnimation(ANIMATION_TYPES.MONSTER_SLIME_IDLE)
 end
 

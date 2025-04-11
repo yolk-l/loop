@@ -19,7 +19,7 @@ local MONSTER_TO_CARD_TYPE = {
     goblin = 2,     -- 哥布林 -> 哥布林小屋
     skeleton = 3,   -- 骷髅 -> 骷髅墓地
     zombie = 4,     -- 僵尸 -> 僵尸墓园
-    werewolf = 5,   -- 狼人 -> 狼人巢穴
+    wolf = 5,   -- 狼人 -> 狼人巢穴
     ghost = 6,      -- 幽灵 -> 幽灵庄园
     golem = 7,      -- 石巨人 -> 巨人熔炉
     witch = 8,      -- 女巫 -> 女巫小屋
@@ -167,7 +167,7 @@ local DROP_TABLE = {
         },
         cardChance = 0.2   -- 20%
     },
-    werewolf = {
+    wolf = {
         equipment = {
             {id = "iron_sword", chance = 0.3},    -- 30%
             {id = "leather_armor", chance = 0.2}, -- 20%
