@@ -11,11 +11,15 @@ local AnimationSystem = require('src/systems/Animation')
 -- 引入像素精灵生成器
 local PixelSprites = require('src/utils/PixelSprites')
 
+-- 引入子弹类
+local Bullet = require('src/entities/Bullet')
+
 -- 获取动画系统资源
 local resources = AnimationSystem.getResources()
 
 -- 字体缓存
 local monsterFont = nil
+local bullets = {}  -- 怪物发射的子弹数组
 
 -- 初始化字体
 local function initFont()
@@ -108,9 +112,23 @@ function Monster:attack(target)
         self.status.isAttacking = true
         self.status.lastAttackTime = currentTime
         
-        -- 对目标造成伤害
-        local damage = self.attributes.attack
-        return target:takeDamage(damage)
+        -- 根据攻击类型执行不同的攻击方式
+        if self.config.attackType == "melee" then
+            -- 近战攻击直接造成伤害
+            local damage = self.attributes.attack
+            return target:takeDamage(damage)
+        else
+            -- 远程攻击发射子弹
+            local bullet = Bullet:new(
+                self.x, self.y,           -- 起始位置
+                target.x, target.y,       -- 目标位置
+                self.config.bulletSpeed,  -- 子弹速度
+                self.attributes.attack,    -- 伤害
+                self.type                 -- 发射者类型
+            )
+            table.insert(bullets, bullet)
+            return true
+        end
     end
     
     return false
@@ -249,6 +267,28 @@ function Monster:draw()
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
+end
+
+-- 获取所有子弹
+function Monster.getBullets()
+    return bullets
+end
+
+-- 更新所有子弹
+function Monster.updateBullets(dt)
+    for i = #bullets, 1, -1 do
+        bullets[i]:update(dt)
+        if not bullets[i].status.isActive then
+            table.remove(bullets, i)
+        end
+    end
+end
+
+-- 绘制所有子弹
+function Monster.drawBullets()
+    for _, bullet in ipairs(bullets) do
+        bullet:draw()
+    end
 end
 
 return Monster 

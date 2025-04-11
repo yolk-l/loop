@@ -129,6 +129,35 @@ function love.update(dt)
         end
     end
     
+    -- 更新所有子弹
+    Monster.updateBullets(dt)
+    player:updateBullets(dt)
+    
+    -- 处理子弹碰撞
+    local playerBullets = player:getBullets()
+    local monsterBullets = Monster.getBullets()
+    
+    -- 检查玩家子弹与怪物的碰撞
+    for i = #playerBullets, 1, -1 do
+        local bullet = playerBullets[i]
+        for _, monster in ipairs(monsters) do
+            if bullet:checkCollision(monster) then
+                monster:takeDamage(bullet.damage)
+                table.remove(playerBullets, i)
+                break
+            end
+        end
+    end
+    
+    -- 检查怪物子弹与玩家的碰撞
+    for i = #monsterBullets, 1, -1 do
+        local bullet = monsterBullets[i]
+        if bullet:checkCollision(player) then
+            player:takeDamage(bullet.damage)
+            table.remove(monsterBullets, i)
+        end
+    end
+    
     -- 检查物品拾取
     for i = #items, 1, -1 do
         local item = items[i]
@@ -162,6 +191,9 @@ function love.draw()
     
     -- 绘制玩家
     player:draw()
+    
+    -- 绘制所有子弹
+    Monster.drawBullets()
     
     -- 绘制攻击特效
     for _, effect in ipairs(attackEffects) do

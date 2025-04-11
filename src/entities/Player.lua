@@ -6,6 +6,7 @@ Player.__index = Player
 local ItemSystem = require('src/systems/Item')
 local TerrainConfig = require('config/terrain')
 local AnimationSystem = require('src/systems/Animation')
+local Bullet = require('src/entities/Bullet')
 
 -- 获取动画系统资源
 local resources = AnimationSystem.getResources()
@@ -29,6 +30,7 @@ function Player:new(x, y)
     self.baseSpeed = 80  -- 基础移动速度
     self.size = 10       -- 玩家大小，从20减小到10
     self.map = nil       -- 地图引用
+    self.bullets = {}    -- 玩家发射的子弹数组
     
     -- 防御区域设置
     self.defenseRadius = 150   -- 防御区域半径，不可建造建筑
@@ -44,8 +46,9 @@ function Player:new(x, y)
         exp = 0,         -- 经验值
         nextLevelExp = 100,  -- 升级所需经验
         speed = 80,      -- 移动速度
-        attackCooldown = 1.0,  -- 攻击冷却时间（秒）
-        lastAttackTime = 0     -- 上次攻击时间
+        attackCooldown = 0.5,  -- 攻击冷却时间（秒）
+        lastAttackTime = 0,    -- 上次攻击时间
+        bulletSpeed = 300      -- 子弹速度
     }
     
     -- 装备栏
@@ -59,7 +62,7 @@ function Player:new(x, y)
     self.status = {
         isAttacking = false,  -- 是否在攻击中
         attackCooldown = 0,   -- 攻击冷却
-        attackRange = 50,     -- 攻击范围
+        attackRange = 200,    -- 攻击范围
         lastAttackTime = 0,   -- 上次攻击时间
         attackStartTime = 0,  -- 攻击开始时间
         isAIControlled = false, -- 是否由AI控制
@@ -119,7 +122,8 @@ function Player:update(dt)
         self.animation:update(dt)
     end
     
-    -- 玩家固定在地图中央，所以不再处理移动逻辑
+    -- 更新子弹
+    self:updateBullets(dt)
     
     -- 更新攻击冷却
     if self.attributes.lastAttackTime > 0 then
@@ -187,44 +191,15 @@ function Player:attack(target)
             self.status.attackStartTime = currentTime
             self.attributes.lastAttackTime = currentTime  -- 设置上次攻击时间，启动冷却
             
-            -- 计算伤害
-            local damage = math.max(1, self.attributes.attack - (target.attributes.defense or 0))
-            target:takeDamage(damage)
-            
-            -- 创建攻击特效
-            local effect = {
-                x = target.x,
-                y = target.y,
-                size = 20,
-                alpha = 0.8,
-                color = {1, 0, 0}  -- 红色
-            }
-            
-            -- 添加到全局特效数组
-            table.insert(attackEffects, effect)
-            
-            -- 使用计时器实现特效动画和移除
-            if gameTimer then
-                gameTimer:after(0.3, function()
-                    -- 找到并移除特效
-                    for i, e in ipairs(attackEffects) do
-                        if e == effect then
-                            table.remove(attackEffects, i)
-                            break
-                        end
-                    end
-                end)
-                
-                -- 特效动画 - 逐渐扩大并淡出
-                gameTimer:tween(0.3, effect, {size = 40, alpha = 0}, 'linear')
-            end
-            
-            -- 使用计时器延迟重置攻击状态
-            if gameTimer then
-                gameTimer:after(0.2, function()
-                    self.status.isAttacking = false
-                end)
-            end
+            -- 创建子弹
+            local bullet = Bullet:new(
+                self.x, self.y,           -- 起始位置
+                target.x, target.y,       -- 目标位置
+                self.attributes.bulletSpeed,  -- 子弹速度
+                self.attributes.attack,    -- 伤害
+                "player"                  -- 发射者类型
+            )
+            table.insert(self.bullets, bullet)
             
             return true  -- 攻击成功
         end
@@ -482,6 +457,9 @@ function Player:draw()
     love.graphics.setColor(0.2, 0.6, 0.8, 0.3)
     love.graphics.circle('line', self.x, self.y, self.attackRadius)
     
+    -- 绘制子弹
+    self:drawBullets()
+    
     -- 绘制生命条
     local hpBarWidth = self.size * 2
     local hpBarHeight = 3
@@ -532,6 +510,28 @@ end
 
 function Player:setAttackEffects(effects)
     attackEffects = effects
+end
+
+-- 获取所有子弹
+function Player:getBullets()
+    return self.bullets
+end
+
+-- 更新所有子弹
+function Player:updateBullets(dt)
+    for i = #self.bullets, 1, -1 do
+        self.bullets[i]:update(dt)
+        if not self.bullets[i].status.isActive then
+            table.remove(self.bullets, i)
+        end
+    end
+end
+
+-- 绘制所有子弹
+function Player:drawBullets()
+    for _, bullet in ipairs(self.bullets) do
+        bullet:draw()
+    end
 end
 
 return Player 
