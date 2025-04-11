@@ -42,13 +42,33 @@ function Item:isInRange(playerX, playerY)
 end
 
 function Item:draw()
-    -- 绘制物品外观
-    love.graphics.setColor(unpack(self.config.color))
-    love.graphics.circle('fill', self.x, self.y, self.size)
+    -- 获取装备图像
+    local AnimationSystem = require('src/systems/Animation')
+    local image = nil
     
-    -- 绘制边框
-    love.graphics.setColor(0.3, 0.3, 0.3)
-    love.graphics.circle('line', self.x, self.y, self.size)
+    -- 根据装备类型获取对应图像
+    if self.config.image then
+        image = AnimationSystem.getWeaponImage(self.config.image)
+    end
+    
+    if image then
+        -- 绘制物品图像
+        love.graphics.setColor(1, 1, 1)
+        local scale = 1.5  -- 缩放比例，根据需要调整
+        local imgWidth, imgHeight = image:getDimensions()
+        local x = self.x - (imgWidth * scale)/2
+        local y = self.y - (imgHeight * scale)/2
+        
+        love.graphics.draw(image, x, y, 0, scale, scale)
+    else
+        -- 如果没有图像，使用圆形表示
+        love.graphics.setColor(unpack(self.config.color))
+        love.graphics.circle('fill', self.x, self.y, self.size)
+        
+        -- 绘制边框
+        love.graphics.setColor(0.3, 0.3, 0.3)
+        love.graphics.circle('line', self.x, self.y, self.size)
+    end
     
     -- 绘制物品名称
     love.graphics.setFont(fonts.name)

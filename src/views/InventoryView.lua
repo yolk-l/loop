@@ -60,8 +60,30 @@ function InventoryView:draw(items, selected, x, y)
             -- 绘制物品（如果有）
             if items[index] then
                 local item = items[index]
-                love.graphics.setColor(item.config.color)
-                love.graphics.circle('fill', slotX + self.slotSize/2, slotY + self.slotSize/2, self.slotSize/3)
+                
+                -- 获取装备图像
+                local AnimationSystem = require('src/systems/Animation')
+                local image = nil
+                
+                -- 根据装备类型获取对应图像
+                if item.config.image then
+                    image = AnimationSystem.getWeaponImage(item.config.image)
+                end
+                
+                if image then
+                    -- 居中绘制图像
+                    love.graphics.setColor(1, 1, 1)
+                    local scale = 1.5  -- 缩放比例，根据需要调整
+                    local imgWidth, imgHeight = image:getDimensions()
+                    local imgX = slotX + self.slotSize/2 - (imgWidth * scale)/2
+                    local imgY = slotY + self.slotSize/2 - (imgHeight * scale)/2
+                    
+                    love.graphics.draw(image, imgX, imgY, 0, scale, scale)
+                else
+                    -- 如果没有图像，使用圆形表示
+                    love.graphics.setColor(item.config.color)
+                    love.graphics.circle('fill', slotX + self.slotSize/2, slotY + self.slotSize/2, self.slotSize/3)
+                end
                 
                 -- 保存选中物品信息，在外部最后绘制提示
                 if selected == index then
@@ -112,6 +134,26 @@ function InventoryView:drawItemTooltip()
         tooltipHeight = tooltipHeight + 20
     end
     
+    -- 如果有描述，增加高度
+    if item.config.description then
+        local descWidth = fonts.description:getWidth(item.config.description)
+        attributeWidth = math.max(attributeWidth, descWidth)
+        tooltipHeight = tooltipHeight + 20
+    end
+    
+    -- 获取图像
+    local hasImage = false
+    local AnimationSystem = require('src/systems/Animation')
+    local image = nil
+    
+    if item.config.image then
+        image = AnimationSystem.getWeaponImage(item.config.image)
+        if image then 
+            hasImage = true
+            tooltipHeight = tooltipHeight + 30
+        end
+    end
+    
     -- 计算提示框宽度
     local tooltipWidth = math.max(nameWidth, attributeWidth) + tooltipPadding * 2
     
@@ -126,13 +168,33 @@ function InventoryView:drawItemTooltip()
     love.graphics.setColor(0.5, 0.5, 0.5)
     love.graphics.rectangle('line', tooltipX, tooltipY, tooltipWidth, tooltipHeight, 5, 5)
     
+    -- 当前Y位置，用于垂直布局
+    local currentY = tooltipY + tooltipPadding
+    
     -- 绘制名称
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print(item.config.name, tooltipX + tooltipPadding, tooltipY + tooltipPadding)
+    love.graphics.print(item.config.name, tooltipX + tooltipPadding, currentY)
+    currentY = currentY + 20
+    
+    -- 绘制图像
+    if hasImage then
+        local scale = 1.3
+        local imgWidth, imgHeight = image:getDimensions()
+        local imgX = tooltipX + tooltipWidth/2 - (imgWidth * scale)/2
+        
+        love.graphics.draw(image, imgX, currentY, 0, scale, scale)
+        currentY = currentY + imgHeight * scale + 5
+    end
     
     -- 绘制属性
     if attributeText ~= "" then
-        love.graphics.print(attributeText, tooltipX + tooltipPadding, tooltipY + tooltipPadding + 20)
+        love.graphics.print(attributeText, tooltipX + tooltipPadding, currentY)
+        currentY = currentY + 20
+    end
+    
+    -- 绘制描述
+    if item.config.description then
+        love.graphics.print(item.config.description, tooltipX + tooltipPadding, currentY)
     end
     
     -- 重置颜色

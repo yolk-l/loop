@@ -142,11 +142,33 @@ function CharacterUI:drawEquipmentSlot(name, slot, equipment)
     
     -- 如果有装备，绘制装备信息
     if equipment then
-        love.graphics.setColor(equipment.config.color)
-        love.graphics.circle('fill', slot.x + slot.width/2, slot.y + slot.height/2, 20)
+        love.graphics.setColor(1, 1, 1)  -- 设置为白色以正常显示图像
         
-        love.graphics.setColor(0.3, 0.3, 0.3)
-        love.graphics.circle('line', slot.x + slot.width/2, slot.y + slot.height/2, 20)
+        -- 获取装备图像
+        local AnimationSystem = require('src/systems/Animation')
+        local image = nil
+        
+        -- 根据装备类型获取对应图像
+        if equipment.config.image then
+            image = AnimationSystem.getWeaponImage(equipment.config.image)
+        end
+        
+        if image then
+            -- 居中绘制图像
+            local scale = 2  -- 缩放比例，根据需要调整
+            local imgWidth, imgHeight = image:getDimensions()
+            local x = slot.x + slot.width/2 - (imgWidth * scale)/2
+            local y = slot.y + slot.height/2 - (imgHeight * scale)/2
+            
+            love.graphics.draw(image, x, y, 0, scale, scale)
+        else
+            -- 如果没有图像，退回到原来的圆形显示
+            love.graphics.setColor(equipment.config.color)
+            love.graphics.circle('fill', slot.x + slot.width/2, slot.y + slot.height/2, 20)
+            
+            love.graphics.setColor(0.3, 0.3, 0.3)
+            love.graphics.circle('line', slot.x + slot.width/2, slot.y + slot.height/2, 20)
+        end
         
         -- 绘制装备名称
         love.graphics.setFont(fonts.description)

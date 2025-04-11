@@ -42,7 +42,12 @@ local ANIMATION_TYPES = {
     MONSTER_GOLEM_ATTACK = "monster_golem_attack",
     MONSTER_DRAGON_IDLE = "monster_dragon_idle",
     MONSTER_DRAGON_MOVE = "monster_dragon_move",
-    MONSTER_DRAGON_ATTACK = "monster_dragon_attack"
+    MONSTER_DRAGON_ATTACK = "monster_dragon_attack",
+    
+    -- 武器类型
+    WEAPON_WOODEN_SWORD = "weapon_wooden_sword",
+    WEAPON_IRON_SWORD = "weapon_iron_sword",
+    WEAPON_FLAME_SWORD = "weapon_flame_sword"
 }
 
 -- 确保资源目录存在
@@ -123,6 +128,11 @@ function AnimationSystem.initialize()
     resources.images.item = loadOrGenerateImage("assets/sprites/equipments/item_sheet.png", "item", 8, PixelSprites.COLORS.YELLOW)
     resources.images.effect = loadOrGenerateImage("assets/sprites/effect_sheet.png", "effect", 16, PixelSprites.COLORS.WHITE)
     
+    -- 添加武器图像
+    resources.images.wooden_sword = loadOrGenerateImage("assets/sprites/equipments/wooden_sword.png", "item", 16, PixelSprites.COLORS.BROWN)
+    resources.images.iron_sword = loadOrGenerateImage("assets/sprites/equipments/iron_sword.png", "item", 16, PixelSprites.COLORS.GRAY)
+    resources.images.flame_sword = loadOrGenerateImage("assets/sprites/equipments/flame_sword.png", "item", 16, PixelSprites.COLORS.RED)
+    
     -- 创建网格
     -- 玩家网格 (16x16像素每帧)
     resources.grids.player = anim8.newGrid(16, 16, resources.images.player:getWidth(), resources.images.player:getHeight())
@@ -142,6 +152,11 @@ function AnimationSystem.initialize()
     resources.grids.building = anim8.newGrid(32, 32, resources.images.building:getWidth(), resources.images.building:getHeight())
     resources.grids.item = anim8.newGrid(8, 8, resources.images.item:getWidth(), resources.images.item:getHeight())
     resources.grids.effect = anim8.newGrid(16, 16, resources.images.effect:getWidth(), resources.images.effect:getHeight())
+    
+    -- 武器网格
+    resources.grids.wooden_sword = anim8.newGrid(16, 16, resources.images.wooden_sword:getWidth(), resources.images.wooden_sword:getHeight())
+    resources.grids.iron_sword = anim8.newGrid(16, 16, resources.images.iron_sword:getWidth(), resources.images.iron_sword:getHeight())
+    resources.grids.flame_sword = anim8.newGrid(16, 16, resources.images.flame_sword:getWidth(), resources.images.flame_sword:getHeight())
     
     -- 创建动画
     -- 玩家动画
@@ -187,7 +202,10 @@ function AnimationSystem.initialize()
     resources.animations[ANIMATION_TYPES.MONSTER_DRAGON_MOVE] = anim8.newAnimation(resources.grids.dragon('1-4', 2), 0.15)
     resources.animations[ANIMATION_TYPES.MONSTER_DRAGON_ATTACK] = anim8.newAnimation(resources.grids.dragon('1-4', 3), 0.1)
     
-
+    -- 武器动画
+    resources.animations[ANIMATION_TYPES.WEAPON_WOODEN_SWORD] = anim8.newAnimation(resources.grids.wooden_sword('1-1', 1), 0.1)
+    resources.animations[ANIMATION_TYPES.WEAPON_IRON_SWORD] = anim8.newAnimation(resources.grids.iron_sword('1-1', 1), 0.1)
+    resources.animations[ANIMATION_TYPES.WEAPON_FLAME_SWORD] = anim8.newAnimation(resources.grids.flame_sword('1-1', 1), 0.1)
 end
 
 -- 获取单帧图像（适用于非动画对象，如建筑物、物品等）
@@ -210,6 +228,32 @@ function AnimationSystem.getImage(type, customColor)
     else
         return resources.images.player
     end
+end
+
+-- 获取武器图像
+function AnimationSystem.getWeaponImage(weaponType)
+    if resources.images[weaponType] then
+        return resources.images[weaponType]
+    end
+    -- 默认返回木剑图像
+    return resources.images.wooden_sword
+end
+
+-- 获取武器动画
+function AnimationSystem.getWeaponAnimation(weaponType)
+    local animationMap = {
+        wooden_sword = ANIMATION_TYPES.WEAPON_WOODEN_SWORD,
+        iron_sword = ANIMATION_TYPES.WEAPON_IRON_SWORD,
+        fire_sword = ANIMATION_TYPES.WEAPON_FLAME_SWORD
+    }
+    
+    local animationType = animationMap[weaponType]
+    if animationType and resources.animations[animationType] then
+        return resources.animations[animationType]:clone()
+    end
+    
+    -- 默认返回木剑动画
+    return resources.animations[ANIMATION_TYPES.WEAPON_WOODEN_SWORD]:clone()
 end
 
 -- 获取动画实例（返回一个克隆，以便每个实体有自己的动画状态）

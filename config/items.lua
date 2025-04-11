@@ -36,7 +36,8 @@ local EQUIPMENT_CONFIG = {
         attributes = {
             attack = 8
         },
-        description = "一把普通的木剑"
+        description = "一把普通的木剑",
+        image = "wooden_sword" -- 图像引用
     },
     iron_sword = {
         name = "铁剑",
@@ -45,7 +46,8 @@ local EQUIPMENT_CONFIG = {
         attributes = {
             attack = 15
         },
-        description = "锋利的铁剑"
+        description = "锋利的铁剑",
+        image = "iron_sword" -- 图像引用
     },
     fire_sword = {
         name = "烈焰剑",
@@ -54,7 +56,8 @@ local EQUIPMENT_CONFIG = {
         attributes = {
             attack = 25
         },
-        description = "散发着火焰的魔剑"
+        description = "散发着火焰的魔剑",
+        image = "flame_sword" -- 图像引用
     },
     -- 护甲
     leather_armor = {
