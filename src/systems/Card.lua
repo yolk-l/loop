@@ -21,29 +21,15 @@ local function initFonts()
     end
 end
 
-function Card:new(cardOrType)
-    local self = setmetatable({}, Card)
-    
-    -- 检查参数是否为table，支持直接传入配置
-    if type(cardOrType) == "table" then
-        self.config = cardOrType
-        self.type = cardOrType.type or 1  -- 默认类型为1
-        
-        -- 确保config中包含必要的属性
-        if not self.config.color then
-            self.config.color = {0.8, 0.8, 0.8}  -- 默认颜色
-        end
-    else
-        -- 按照原来的方式，通过cardType查找配置
-        self.type = cardOrType
-        self.config = CardConfig.CARD_CONFIG[cardOrType]
-    end
-    
-    self.width = 100
-    self.height = 150
-    self.selected = false
-    initFonts()  -- 确保字体已加载
-    return self
+function Card:new(cardType)
+    initFonts()
+    return setmetatable({
+        type = cardType,
+        config = CardConfig.CARD_CONFIG[cardType],
+        width = 100,
+        height = 150,
+        selected = false
+    }, Card)
 end
 
 function Card:draw(x, y)

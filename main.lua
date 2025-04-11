@@ -319,16 +319,10 @@ function love.mousepressed(x, y, button)
                     if buildingType then
                         local building = Building:new(buildingType, tileX, tileY)
                         
-                        -- 应用卡牌中的自定义属性到建筑
-                        if cardController.selectedCard.config.lifespan then
-                            building.attributes.lifespan = cardController.selectedCard.config.lifespan
-                            building.attributes.remainingTime = building.attributes.lifespan
-                        end
-                        
-                        if cardController.selectedCard.config.spawnRate then
-                            building.attributes.spawnRate = cardController.selectedCard.config.spawnRate
-                            building.status.timeToNextSpawn = building.attributes.spawnRate
-                        end
+                        -- 不再使用卡牌配置中的自定义属性，而是使用建筑配置中的默认值
+                        -- 重置剩余时间和生成计时器
+                        building.attributes.remainingTime = building.attributes.lifespan
+                        building.status.timeToNextSpawn = building.attributes.spawnRate
                         
                         -- 添加建筑到列表中
                         table.insert(buildings, building)

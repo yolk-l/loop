@@ -89,13 +89,7 @@ function CardController:addCard(cardType)
     
     -- 创建新卡牌
     local cardConfig = cardTypes[cardType]
-    local card = Card:new({
-        name = cardConfig.name,
-        description = cardConfig.description,
-        buildingType = cardConfig.buildingType,
-        color = cardConfig.color,
-        type = cardType
-    })
+    local card = Card:new(cardType)
     
     -- 添加到手牌
     table.insert(self.hand, card)

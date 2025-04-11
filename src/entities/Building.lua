@@ -13,6 +13,8 @@ local BuildingConfig = require('config/buildings')
 
 -- 字体缓存
 local buildingFont = nil
+-- 建筑图片缓存
+local buildingImages = {}
 
 -- 初始化字体
 local function initFont()
@@ -21,12 +23,52 @@ local function initFont()
     end
 end
 
+-- 加载建筑图片
+local function loadBuildingImage(type)
+    if buildingImages[type] then
+        return buildingImages[type]
+    end
+    
+    -- 建筑类型到图片名称的映射
+    local imageNameMap = {
+        slime_nest = "slime_nest",
+        goblin_hut = "goblin_hut",
+        skeleton_tomb = "skeleton_graveyard",
+        zombie_graveyard = "zombie_graveyard",
+        wolf_den = "werewolf_den",
+        ghost_manor = "ghost_mansion",
+        golem_forge = "giant_furnace",
+        witch_hut = "witch_hut",
+        dragon_cave = "dragon_cave"
+    }
+    
+    -- 获取对应的图片名称
+    local imageName = imageNameMap[type] or type
+    
+    -- 尝试加载特定建筑图片
+    local imagePath = "assets/sprites/buildings/" .. imageName .. ".png"
+    if love.filesystem.getInfo(imagePath) then
+        buildingImages[type] = love.graphics.newImage(imagePath)
+        return buildingImages[type]
+    end
+    
+    -- 如果没有特定类型的图片，尝试加载默认图片
+    imagePath = "assets/sprites/buildings/default_building.png"
+    if love.filesystem.getInfo(imagePath) then
+        buildingImages[type] = love.graphics.newImage(imagePath)
+        return buildingImages[type]
+    end
+    
+    -- 如果没有默认图片，使用生成的图像
+    buildingImages[type] = AnimationSystem.getImage("building")
+    return buildingImages[type]
+end
+
 function Building:new(type, x, y)
     local self = setmetatable({}, Building)
     self.type = type
     self.x = x
     self.y = y
-    self.size = 16  -- 建筑基础大小
     
     -- 从配置文件获取建筑类型配置
     local config = BuildingConfig.get(type)
@@ -49,9 +91,16 @@ function Building:new(type, x, y)
         wanderRadius = config.attributes.wanderRadius
     }
     
-    -- 获取建筑精灵
-    self.sprite = AnimationSystem.getImage("building")
-    self.scale = 1.0  -- 精灵缩放
+    -- 获取建筑图片
+    self.sprite = loadBuildingImage(type)
+    
+    -- 设置适当的缩放比例，使图片大小适合游戏
+    -- 根据图片尺寸设置不同的缩放比例，以保持建筑在游戏中的大小一致
+    local imgWidth, imgHeight = self.sprite:getDimensions()
+    self.scale = 32 / math.max(imgWidth, imgHeight)  -- 目标大小为32像素
+    
+    -- 设置建筑的碰撞尺寸，使用缩放后的图片尺寸
+    self.size = (math.max(imgWidth, imgHeight) * self.scale) / 2
     
     -- 状态系统
     self.status = {
@@ -129,8 +178,8 @@ function Building:draw()
     -- 应用一个微小的偏移量，用于呼吸动画效果
     local breathOffset = math.sin(self.status.animTime * 2) * 2
     
-    -- 绘制建筑精灵
-    love.graphics.setColor(unpack(self.spriteColor or self.color))
+    -- 绘制建筑图片
+    love.graphics.setColor(1, 1, 1)  -- 使用原始颜色，不再使用tint
     love.graphics.draw(
         self.sprite, 
         self.x, 
