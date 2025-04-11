@@ -120,7 +120,7 @@ function love.update(dt)
             end
             
             -- 给玩家经验值
-            player:gainExp(monster.attributes.exp)
+            player:gainExp(monster.config.expValue)
             -- 移除怪物
             table.remove(monsters, i)
         else

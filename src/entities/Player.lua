@@ -16,6 +16,14 @@ local playerFont = nil
 local gameTimer = nil  -- 引用全局计时器实例
 local attackEffects  -- 全局攻击特效数组的引用
 
+-- 子弹图片缓存
+local bulletImage = nil
+
+-- 加载子弹图片
+local function loadBulletImage()
+    bulletImage = love.graphics.newImage("assets/sprites/bullets/normal_bullet.png")
+end
+
 -- 初始化字体
 local function initFont()
     if not playerFont then
@@ -80,6 +88,11 @@ function Player:new(x, y)
         defense = 0,
         speed = 0
     }
+    
+    -- 加载子弹图片
+    if not bulletImage then
+        loadBulletImage()
+    end
     
     initFont()  -- 确保字体已加载
     return self

@@ -21,6 +21,14 @@ local resources = AnimationSystem.getResources()
 local monsterFont = nil
 local bullets = {}  -- 怪物发射的子弹数组
 
+-- 子弹图片缓存
+local bulletImage = nil
+
+-- 加载子弹图片
+local function loadBulletImage()
+    bulletImage = love.graphics.newImage("assets/sprites/bullets/normal_bullet.png")
+end
+
 -- 初始化字体
 local function initFont()
     if not monsterFont then
@@ -77,6 +85,11 @@ function Monster:new(type, x, y)
             math.random(0.5, 1.0)
         }
         self.pixelSprite = PixelSprites.generateMonsterSprite(16, randomColor)
+    end
+    
+    -- 加载子弹图片
+    if not bulletImage then
+        loadBulletImage()
     end
     
     initFont()
@@ -287,7 +300,8 @@ end
 -- 绘制所有子弹
 function Monster.drawBullets()
     for _, bullet in ipairs(bullets) do
-        bullet:draw()
+        love.graphics.draw(bulletImage, bullet.x, bullet.y, bullet.angle, 1, 1,
+            bulletImage:getWidth()/2, bulletImage:getHeight()/2)
     end
 end
 
