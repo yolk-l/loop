@@ -7,31 +7,39 @@ local PlayerView = require('src/views/PlayerView')
 local BulletModel = require('src/models/BulletModel')
 
 function PlayerController:new(x, y)
-    local mt = setmetatable({}, PlayerController)
-    mt.model = PlayerModel:new(x, y)
-    mt.view = PlayerView:new()
-    return mt
+    local self = setmetatable({}, PlayerController)
+    self.model = PlayerModel:new(x, y)
+    self.view = PlayerView:new()
+    return self
 end
 
 function PlayerController:setMap(map)
     self.model:setMap(map)
 end
 
-function PlayerController:update(dt, monsters)
-    -- 更新玩家模型
-    self.model:update(dt)
+function PlayerController:update(dt)
+    -- 更新动画
+    if self.model.animation then
+        self.model.animation:update(dt)
+    end
     
-    -- 如果是AI控制，更新AI行为
-    if self.model.status.isAIControlled then
-        local bulletInfo = self.model:updateAI(dt, monsters)
-        
-        -- 如果AI决定攻击，创建子弹
-        if bulletInfo then
-            self:createBullet(bulletInfo)
+    -- 更新子弹
+    self.model:updateBullets(dt)
+    
+    -- 更新攻击冷却
+    if self.model.attributes.lastAttackTime > 0 then
+        local currentTime = love.timer.getTime()
+        if currentTime - self.model.attributes.lastAttackTime > self.model.attributes.attackCooldown then
+            self.model.attributes.lastAttackTime = 0  -- 冷却完毕
         end
-    else
-        -- 自动攻击范围内的怪物
-        self:autoAttack(monsters)
+    end
+    
+    -- 如果没有全局timer，则使用手动计时方式
+    if not gameTimer and self.model.status.isAttacking then
+        local currentTime = love.timer.getTime()
+        if currentTime - self.model.status.attackStartTime > 0.2 then
+            self.model.status.isAttacking = false  -- 攻击效果结束
+        end
     end
 end
 
@@ -44,38 +52,36 @@ function PlayerController:move(dx, dy, dt)
 end
 
 function PlayerController:attack(target)
-    local bulletInfo = self.model:attack(target)
-    if bulletInfo then
-        self:createBullet(bulletInfo)
-        return true
-    end
-    return false
+    -- 攻击逻辑实现
+    -- 例如：减少目标生命值，播放攻击动画等
 end
 
 function PlayerController:autoAttack(monsters)
-    if not monsters then return end
+    -- 如果正在冷却中，不进行攻击
+    if self.model.attributes.lastAttackTime > 0 then
+        return
+    end
     
-    local targetMonster = nil
-    local closestDistance = self.model.status.attackRange
+    -- 查找范围内的怪物并攻击
+    local closestMonster = nil
+    local closestDistance = self.model.attackRadius
     
-    -- 寻找范围内最近的怪物
     for _, monster in ipairs(monsters) do
-        if not monster:isDead() then
-            local monsterPos = monster:getPosition()
-            local dx = monsterPos.x - self.model.x
-            local dy = monsterPos.y - self.model.y
+        if not monster.status.isDead then
+            local dx = monster.x - self.model.x
+            local dy = monster.y - self.model.y
             local distance = math.sqrt(dx * dx + dy * dy)
             
             if distance < closestDistance then
                 closestDistance = distance
-                targetMonster = monster
+                closestMonster = monster
             end
         end
     end
     
-    -- 如果找到目标，攻击它
-    if targetMonster then
-        self:attack(targetMonster)
+    -- 执行攻击逻辑
+    if closestMonster then
+        self:attack(closestMonster)
     end
 end
 

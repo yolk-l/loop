@@ -11,7 +11,7 @@ function PlayerModel:new(x, y)
     self.x = x
     self.y = y
     self.baseSpeed = 80  -- 基础移动速度
-    self.size = 10       -- 玩家大小
+    self.size = 10       -- 玩家大小，从20减小到10
     self.map = nil       -- 地图引用
     self.bullets = {}    -- 玩家发射的子弹数组
     
@@ -19,7 +19,7 @@ function PlayerModel:new(x, y)
     self.defenseRadius = 150   -- 防御区域半径，不可建造建筑
     self.attackRadius = 100    -- 攻击范围半径，自动攻击该范围内的怪物
     
-    -- 属性系统
+    -- 属性系统（包含暴击相关属性）
     self.attributes = {
         maxHp = 100,       -- 最大生命值
         hp = 100,          -- 当前生命值
@@ -38,7 +38,7 @@ function PlayerModel:new(x, y)
         resistance = 0     -- 抵抗率（百分比）
     }
     
-    -- 符文系统
+    -- 符文系统（替代原来的装备栏）
     self.runes = {
         [1] = nil,  -- 位置1 (右上)
         [2] = nil,  -- 位置2 (右中)

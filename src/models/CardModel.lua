@@ -97,6 +97,7 @@ end
 -- 选择卡牌
 function CardModel:selectCard(index)
     if index and self.hand[index] then
+        print("selectCard", index, self.hand[index], self.selectedIndex)
         if self.selectedIndex == index then
             -- 取消选择
             self.selectedCard = nil
@@ -106,6 +107,7 @@ function CardModel:selectCard(index)
             self.selectedCard = self.hand[index]
             self.selectedIndex = index
         end
+        print("selectedCard", self.selectedCard, self.selectedIndex)
         return true
     end
     
@@ -123,6 +125,10 @@ end
 -- 获取选中的卡牌索引
 function CardModel:getSelectedIndex()
     return self.selectedIndex
+end
+
+function CardModel:getSelectedCard()
+    return self.selectedCard
 end
 
 return CardModel 

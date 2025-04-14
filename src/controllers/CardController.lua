@@ -35,7 +35,7 @@ function CardController:handleMouseClick(x, y)
     if self.view:isHandAreaClicked(x, y) then
         -- 找出点击的是哪张卡牌
         local clickedIndex = self.view:getClickedCardIndex(self.model:getHand(), x, y)
-        
+        print("clickedIndex", clickedIndex)
         if clickedIndex then
             -- 选择或取消选择卡牌
             self.model:selectCard(clickedIndex)
@@ -72,6 +72,10 @@ end
 -- 外部接口以访问 CARD_TYPES
 function CardController:getCardTypes()
     return cardConfig.CARD_TYPES
+end
+
+function CardController:getSelectedCard()
+    return self.model:getSelectedCard()
 end
 
 return CardController 

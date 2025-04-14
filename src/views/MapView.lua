@@ -1,4 +1,4 @@
--- MapView类
+-- 地图视图
 local MapView = {}
 MapView.__index = MapView
 
@@ -11,17 +11,21 @@ function MapView:new()
 end
 
 function MapView:draw(mapModel)
-    -- 获取地图尺寸和数据
-    local dimensions = mapModel:getDimensions()
-    local highResMap = mapModel:getHighResMap()
-    local decorations = mapModel:getDecorations()
-    local decorationData = mapModel:getDecorationData()
-    
-    -- 绘制高分辨率地图
-    self:drawHighResMap(highResMap, dimensions)
-    
-    -- 绘制装饰物
-    self:drawDecorations(mapModel, decorations, decorationData)
+    -- for y = 1, mapModel.gridHeight do
+    --     for x = 1, mapModel.gridWidth do
+    --         local terrainType = mapModel.tiles[y][x]
+    --         self:drawTile(x, y, terrainType, mapModel.tileSize)
+    --     end
+    -- end
+    self:drawHighResMap(mapModel.highResMap, mapModel:getDimensions())
+    self:drawDecorations(mapModel, mapModel.decorations, mapModel.decorationData)
+end
+
+function MapView:drawTile(x, y, terrainType, tileSize)
+    local color = TerrainConfig.TERRAIN_COLORS[terrainType] or {1, 1, 1}  -- 默认白色
+    love.graphics.setColor(color)
+    love.graphics.rectangle('fill', (x-1) * tileSize, (y-1) * tileSize, tileSize, tileSize)
+    love.graphics.setColor(1, 1, 1)  -- 重置颜色
 end
 
 function MapView:drawHighResMap(highResMap, dimensions)
@@ -298,6 +302,89 @@ function MapView:drawForestDecorations(pixelX, pixelY, tileSize, data)
             pixelY + data.mushroom.y - tileSize/10, 
             tileSize/15, tileSize/30)
     end
+end
+
+function MapView:generateMap(mapModel)
+    -- 生成不同的种子用于不同的地形层
+    local waterSeed = math.random(1, 1000)
+    local forestSeed = math.random(1, 1000)
+    local sandSeed = math.random(1, 1000)
+    local mountainSeed = math.random(1, 1000)
+    local snowSeed = math.random(1, 1000)
+    local swampSeed = math.random(1, 1000)
+    local volcanoSeed = math.random(1, 1000)
+    
+    -- 初始化地图
+    for y = 1, mapModel.gridHeight do
+        mapModel.tiles[y] = {}
+        for x = 1, mapModel.gridWidth do
+            -- 生成各种地形的噪声值
+            local waterNoise = mapModel:perlinNoise(x/6, y/6, waterSeed, 4)  -- 水域
+            local forestNoise = mapModel:perlinNoise(x/8, y/8, forestSeed, 3)  -- 森林
+            local sandNoise = mapModel:perlinNoise(x/5, y/5, sandSeed, 2)  -- 沙地
+            local mountainNoise = mapModel:perlinNoise(x/7, y/7, mountainSeed, 4)  -- 山地
+            local snowNoise = mapModel:perlinNoise(x/8, y/8, snowSeed, 3)  -- 雪地
+            local swampNoise = mapModel:perlinNoise(x/5, y/5, swampSeed, 2)  -- 沼泽
+            local volcanoNoise = mapModel:perlinNoise(x/9, y/9, volcanoSeed, 3)  -- 火山
+            
+            -- 添加全局高度图，将世界分为不同的高度区域
+            local heightNoise = mapModel:perlinNoise(x/12, y/12, 12345, 4)
+            
+            -- 默认为草地
+            local terrainType = TerrainConfig.TERRAIN_TYPES.GRASS
+            
+            -- 根据高度和噪声值决定地形
+            if heightNoise < 0.3 then
+                -- 低地: 水域、沙地、沼泽
+                if waterNoise > 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.WATER
+                elseif sandNoise > 0.7 and waterNoise > 0.4 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.SAND
+                elseif swampNoise > 0.7 and waterNoise > 0.3 and waterNoise < 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.SWAMP
+                end
+            elseif heightNoise < 0.6 then
+                -- 中地: 草地、森林
+                if forestNoise > 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.FOREST
+                end
+                
+                -- 沿水边生成沙地和沼泽
+                if waterNoise > 0.5 and waterNoise < 0.6 then
+                    if sandNoise > 0.6 then
+                        terrainType = TerrainConfig.TERRAIN_TYPES.SAND
+                    elseif swampNoise > 0.7 then
+                        terrainType = TerrainConfig.TERRAIN_TYPES.SWAMP
+                    end
+                end
+            elseif heightNoise < 0.85 then
+                -- 高地: 山地
+                if mountainNoise > 0.6 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.MOUNTAIN
+                    
+                    -- 山顶有时有雪
+                    if heightNoise > 0.75 and snowNoise > 0.7 then
+                        terrainType = TerrainConfig.TERRAIN_TYPES.SNOW
+                    end
+                end
+            else
+                -- 最高地: 雪地，偶尔有火山
+                if volcanoNoise > 0.85 then
+                    terrainType = TerrainConfig.TERRAIN_TYPES.VOLCANO
+                else
+                    terrainType = TerrainConfig.TERRAIN_TYPES.SNOW
+                end
+            end
+            
+            mapModel.tiles[y][x] = terrainType
+        end
+    end
+    
+    -- 后处理：平滑地形
+    mapModel:smoothTerrain()
+    
+    -- 后处理：确保水域周围有沙地或沼泽
+    mapModel:postProcessTerrain()
 end
 
 return MapView 

@@ -20,7 +20,22 @@ end
 function PlayerView:new()
     initFont()
     local self = setmetatable({}, PlayerView)
+    self.bulletImage = nil
+    self.playerFont = nil
+    self:loadResources()
     return self
+end
+
+function PlayerView:loadResources()
+    -- 加载子弹图片
+    if not self.bulletImage then
+        self.bulletImage = love.graphics.newImage("assets/sprites/bullets/normal_bullet.png")
+    end
+    
+    -- 初始化字体
+    if not self.playerFont then
+        self.playerFont = love.graphics.newFont("assets/fonts/simsun.ttc", 12)
+    end
 end
 
 function PlayerView:draw(playerModel)
