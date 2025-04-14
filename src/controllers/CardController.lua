@@ -6,74 +6,17 @@ CardController.__index = CardController
 local CardModel = require('src/models/CardModel')
 local CardView = require('src/views/CardView')
 local Card = require('src/systems/Card').Card
-
--- 卡牌类型定义
-local cardTypes = {
-    {
-        name = "史莱姆巢穴",
-        description = "生成一个史莱姆巢穴，会持续生成史莱姆",
-        buildingType = "slime_nest",
-        color = {0.3, 0.8, 0.3}
-    },
-    {
-        name = "哥布林小屋",
-        description = "生成一个哥布林小屋，会持续生成哥布林",
-        buildingType = "goblin_hut",
-        color = {0.8, 0.5, 0.3}
-    },
-    {
-        name = "骷髅墓地",
-        description = "生成一个骷髅墓地，会持续生成骷髅",
-        buildingType = "skeleton_tomb",
-        color = {0.8, 0.8, 0.8}
-    },
-    {
-        name = "僵尸墓园",
-        description = "生成一个僵尸墓园，会持续生成僵尸",
-        buildingType = "zombie_graveyard",
-        color = {0.2, 0.5, 0.2}
-    },
-    {
-        name = "狼人巢穴",
-        description = "生成一个狼人巢穴，会持续生成狼人",
-        buildingType = "wolf_den",
-        color = {0.6, 0.3, 0.1}
-    },
-    {
-        name = "幽灵庄园",
-        description = "生成一个幽灵庄园，会持续生成幽灵",
-        buildingType = "ghost_manor",
-        color = {0.7, 0.7, 1.0}
-    },
-    {
-        name = "巨人熔炉",
-        description = "生成一个巨人熔炉，会生成强大的石巨人",
-        buildingType = "golem_forge",
-        color = {0.5, 0.5, 0.6}
-    },
-    {
-        name = "女巫小屋",
-        description = "生成一个女巫小屋，会生成强大的女巫",
-        buildingType = "witch_hut",
-        color = {0.8, 0.3, 0.8}
-    },
-    {
-        name = "龙之洞窟",
-        description = "生成一个龙之洞窟，会生成危险的小龙",
-        buildingType = "dragon_cave",
-        color = {1.0, 0.3, 0.1}
-    }
-}
+local cardConfig = require('config/cards')
 
 function CardController:new()
-    local self = setmetatable({}, CardController)
-    self.model = CardModel:new()
-    self.view = CardView:new()
-    self.selectedCard = nil
-    self.selectedIndex = nil
-    self.hand = {}  -- 初始化手牌数组
-    self.handSize = 5  -- 最大手牌数量
-    return self
+    local mt = setmetatable({}, CardController)
+    mt.model = CardModel:new()
+    mt.view = CardView:new()
+    mt.selectedCard = nil
+    mt.selectedIndex = nil
+    mt.hand = {}  -- 初始化手牌数组
+    mt.handSize = 5  -- 最大手牌数量
+    return mt
 end
 
 function CardController:addCard(cardType)
@@ -83,12 +26,11 @@ function CardController:addCard(cardType)
     end
     
     -- 判断卡牌类型的有效性
-    if cardType < 1 or cardType > #cardTypes then
-        cardType = math.random(1, #cardTypes)
+    if cardType < 1 or cardType > #cardConfig.CARD_TYPES then
+        cardType = math.random(1, #cardConfig.CARD_TYPES)
     end
     
     -- 创建新卡牌
-    local cardConfig = cardTypes[cardType]
     local card = Card:new(cardType)
     
     -- 添加到手牌

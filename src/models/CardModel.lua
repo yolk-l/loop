@@ -2,13 +2,10 @@
 local CardModel = {}
 CardModel.__index = CardModel
 
--- 引入卡牌配置
-local CardConfig = require('config/cards')
-
 function CardModel:new()
-    local self = setmetatable({}, CardModel)
-    self.cards = {}  -- 玩家拥有的卡牌
-    return self
+    local mt = setmetatable({}, CardModel)
+    mt.cards = {}  -- 玩家拥有的卡牌
+    return mt
 end
 
 function CardModel:addCard(cardType)
@@ -22,17 +19,6 @@ function CardModel:removeCard(index)
         return true
     end
     return false
-end
-
-function CardModel:getBuildingCardType(buildingType)
-    if buildingType == "slime_nest" then
-        return CardConfig.CARD_TYPES.SLIME_NEST
-    elseif buildingType == "goblin_hut" then
-        return CardConfig.CARD_TYPES.GOBLIN_HUT
-    elseif buildingType == "skeleton_tomb" then
-        return CardConfig.CARD_TYPES.SKELETON_TOMB
-    end
-    return nil
 end
 
 return CardModel 

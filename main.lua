@@ -53,14 +53,14 @@ function love.load()
     cardController = CardController:new()
     
     -- 初始化背包控制器
-    inventoryController = InventoryController:new()
+    inventoryController = InventoryController:new(30)  -- 明确指定30格容量
     
     -- 初始化角色界面
     characterUI = CharacterUI:new()
     
     -- 初始化手牌
-    for i = 1, 3 do
-        local cardType = math.random(1, 9)  -- 改为1-9，包含所有9种建筑卡牌
+    for _ = 1, 3 do
+        local cardType = math.random(1, 3)  -- 改为1-9，包含所有9种建筑卡牌
         cardController:addCard(cardType)
     end
 end
@@ -107,9 +107,22 @@ function love.update(dt)
             local drops = ItemSystem.Item.generateDrops(monster.type, monster.x, monster.y)
             for _, drop in ipairs(drops) do
                 if drop.isCard then
-                    -- 创建卡牌
-                    local cardType = drop.buildingCardType or math.random(1, 3)
-                    cardController:addCard(cardType)
+                    -- 根据玩家等级检查是否可以获得该卡牌
+                    local canGetCard = false
+                    local cardType = drop.buildingCardType
+                    
+                    -- 根据怪物类型和玩家等级检查是否可以获得该卡牌
+                    if isMonsterInTier(monster.type, "basic") then
+                        canGetCard = player.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.basic
+                    elseif isMonsterInTier(monster.type, "advanced") then
+                        canGetCard = player.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.advanced
+                    elseif isMonsterInTier(monster.type, "elite") then
+                        canGetCard = player.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.elite
+                    end
+                    
+                    if canGetCard then
+                        cardController:addCard(cardType)
+                    end
                 else
                     -- 添加装备掉落物
                     if not inventoryController:addItem(drop) then
@@ -285,22 +298,21 @@ function love.mousepressed(x, y, button)
             if selectedItem then
                 local slot = characterUI:getSlotAt(x, y)
                 if slot then
-                    -- 检查物品类型是否匹配装备槽
-                    local canEquip = false
-                    if slot == "weapon" and selectedItem.config.type == ItemSystem.EQUIPMENT_TYPES.WEAPON then
-                        canEquip = true
-                    elseif slot == "armor" and selectedItem.config.type == ItemSystem.EQUIPMENT_TYPES.ARMOR then
-                        canEquip = true
-                    elseif slot == "accessory" and selectedItem.config.type == ItemSystem.EQUIPMENT_TYPES.ACCESSORY then
-                        canEquip = true
-                    end
+                    -- 检查物品类型是否为符文
+                    local canEquip = selectedItem.isRune
                     
                     if canEquip then
-                        -- 尝试装备物品
-                        local oldEquipment = player:equip(selectedItem)
-                        if oldEquipment then
-                            -- 将旧装备放回背包
-                            inventoryController:addItem(oldEquipment)
+                        -- 检查符文位置是否匹配槽位
+                        if selectedItem.position ~= slot then
+                            print("符文位置不匹配，无法装备")
+                            return
+                        end
+                        
+                        -- 尝试装备符文
+                        local oldRune = player:equipRune(selectedItem)
+                        if oldRune then
+                            -- 将旧符文放回背包
+                            inventoryController:addItem(oldRune)
                         end
                         -- 从背包移除已装备的物品
                         inventoryController:removeItem(inventoryController.model.selected)
@@ -311,10 +323,10 @@ function love.mousepressed(x, y, button)
             
             -- 检查是否点击了已装备的物品（卸下装备）
             local slot = characterUI:getSlotAt(x, y)
-            if slot and player.equipment[slot] then
-                local equipment = player.equipment[slot]
-                if inventoryController:addItem(equipment) then
-                    player.equipment[slot] = nil
+            if slot and player.runes[slot] then
+                local rune = player.runes[slot]
+                if inventoryController:addItem(rune) then
+                    player:unequipRune(slot)
                 end
                 return
             end
@@ -418,12 +430,13 @@ function love.keypressed(key)
             -- 重新初始化卡牌
             cardController = CardController:new()
             for i = 1, 3 do
-                local cardType = math.random(1, 9)  -- 改为1-9，包含所有9种建筑卡牌
+                -- 新游戏只给基础卡牌
+                local cardType = math.random(1, 3)  -- 只用基础卡牌 1-3
                 cardController:addCard(cardType)
             end
             
             -- 重新初始化背包
-            inventoryController = InventoryController:new()
+            inventoryController = InventoryController:new(30)  -- 明确指定30格容量
             
             -- 重新生成地图
             map:generate()
@@ -436,8 +449,33 @@ function love.keypressed(key)
         -- 切换AI控制
         player:setAIControl(not player.status.isAIControlled)
     elseif key == 'd' then
-        -- 抽一张牌
-        local cardType = math.random(1, 9)  -- 改为1-9，包含所有9种建筑卡牌
+        -- 抽一张牌，根据玩家等级决定可以抽取的卡牌类型
+        local maxCardType = getMaxCardTypeByLevel(player.attributes.level)
+        local cardType = math.random(1, maxCardType)
         cardController:addCard(cardType)
+    end
+end
+
+-- 检查怪物是否属于指定层级
+function isMonsterInTier(monsterType, tierName)
+    local monsterTiers = ItemSystem.MONSTER_TIERS
+    if monsterTiers[tierName] then
+        for _, monster in ipairs(monsterTiers[tierName]) do
+            if monster == monsterType then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- 根据玩家等级获取最高可用卡牌类型编号
+function getMaxCardTypeByLevel(level)
+    if level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.elite then
+        return 9  -- 所有卡牌都可用
+    elseif level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.advanced then
+        return 6  -- 基础和高级卡牌可用
+    else
+        return 3  -- 只有基础卡牌可用
     end
 end 

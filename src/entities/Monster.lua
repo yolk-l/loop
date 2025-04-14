@@ -60,7 +60,8 @@ function Monster:new(type, x, y)
         homeBuilding = nil,   -- 怪物所属的建筑
         animTime = 0,         -- 用于简单动画效果
         directionX = 1,       -- 面向方向（1为右，-1为左）
-        bobOffset = 0         -- 上下移动偏移量
+        bobOffset = 0,        -- 上下移动偏移量
+        stunDuration = 0      -- 眩晕持续时间
     }
     
     -- 初始化动画
@@ -182,6 +183,12 @@ function Monster:update(dt, map)
         self.status.bobOffset = math.sin(self.status.animTime * 3) * 1
     end
     
+    -- 处理眩晕状态
+    if self.status.stunDuration > 0 then
+        self.status.stunDuration = self.status.stunDuration - dt
+        return  -- 眩晕状态下不执行其他行为
+    end
+    
     -- 更新攻击状态
     if self.status.isAttacking then
         if love.timer.getTime() - self.status.lastAttackTime > 0.2 then
@@ -280,6 +287,21 @@ function Monster:draw()
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
+    
+    -- 如果处于眩晕状态，绘制眩晕效果
+    if self.status.stunDuration > 0 then
+        love.graphics.setColor(1, 1, 0, 0.7)
+        love.graphics.circle('line', self.x, self.y, self.config.size + 5)
+        
+        -- 绘制星星效果
+        for i = 1, 3 do
+            local angle = self.status.animTime * 2 + i * (2 * math.pi / 3)
+            local starX = self.x + math.cos(angle) * (self.config.size + 10)
+            local starY = self.y + math.sin(angle) * (self.config.size + 10) - 5
+            love.graphics.setColor(1, 1, 0, 0.8)
+            love.graphics.print("✦", starX - 4, starY - 4)
+        end
+    end
 end
 
 -- 获取所有子弹

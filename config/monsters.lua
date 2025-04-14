@@ -1,7 +1,23 @@
 -- 怪物配置文件
 
--- 引入动画类型
-local AnimationTypes = require('src/systems/Animation').TYPES
+local MONSTER_TYPES = {
+    SLIME = 1,
+    GOBLIN = 2,
+    SKELETON = 3,
+    ZOMBIE = 4,
+    WOLF = 5,
+    GHOST = 6,
+    GOLEM = 7,
+    WITCH = 8,
+    DRAGON = 9,
+}
+
+-- 怪物等级分类
+local MONSTER_TIERS = {
+    BASIC = 1,
+    ADVANCED = 2,
+    ELITE = 3
+}
 
 -- 怪物配置
 local MONSTER_CONFIG = {
@@ -12,6 +28,7 @@ local MONSTER_CONFIG = {
         size = 12,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,       -- 近战怪物不需要子弹速度
+        tier = MONSTER_TIERS.BASIC,
         attributes = {
             maxHp = 30,
             hp = 30,
@@ -35,6 +52,7 @@ local MONSTER_CONFIG = {
         size = 14,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
+        tier = MONSTER_TIERS.BASIC,
         attributes = {
             maxHp = 40,
             hp = 40,
@@ -58,6 +76,7 @@ local MONSTER_CONFIG = {
         size = 16,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 200,      -- 子弹速度
+        tier = MONSTER_TIERS.BASIC,
         attributes = {
             maxHp = 50,
             hp = 50,
@@ -83,6 +102,7 @@ local MONSTER_CONFIG = {
         size = 18,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
+        tier = MONSTER_TIERS.ADVANCED,
         attributes = {
             maxHp = 80,
             hp = 80,
@@ -107,6 +127,7 @@ local MONSTER_CONFIG = {
         size = 20,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
+        tier = MONSTER_TIERS.ADVANCED,
         attributes = {
             maxHp = 100,
             hp = 100,
@@ -131,6 +152,7 @@ local MONSTER_CONFIG = {
         size = 16,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 200,      -- 子弹速度
+        tier = MONSTER_TIERS.ADVANCED,
         attributes = {
             maxHp = 70,
             hp = 70,
@@ -156,6 +178,7 @@ local MONSTER_CONFIG = {
         size = 24,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
+        tier = MONSTER_TIERS.ELITE,
         attributes = {
             maxHp = 150,
             hp = 150,
@@ -180,6 +203,7 @@ local MONSTER_CONFIG = {
         size = 18,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 250,      -- 子弹速度
+        tier = MONSTER_TIERS.ELITE,
         attributes = {
             maxHp = 90,
             hp = 90,
@@ -204,6 +228,7 @@ local MONSTER_CONFIG = {
         size = 22,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 300,      -- 子弹速度
+        tier = MONSTER_TIERS.ELITE,
         attributes = {
             maxHp = 120,
             hp = 120,
