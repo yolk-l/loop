@@ -1,8 +1,8 @@
 -- 主入口文件
-local Player = require('src/entities/Player')
-local Map = require('src/systems/Map')
-local Monster = require('src/entities/Monster')
-local Building = require('src/entities/Building')
+local PlayerController = require('src/controllers/PlayerController')
+local MapController = require('src/controllers/MapController')
+local MonsterController = require('src/controllers/MonsterController')
+local BuildingController = require('src/controllers/BuildingController')
 local ItemSystem = require('src/systems/Item')
 local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
@@ -11,18 +11,14 @@ local Timer = require('lib/timer')  -- 引入timer库
 
 -- 游戏状态
 local player
-local map
-local monsters = {}
-local buildings = {}  -- 存储地图上的建筑
-local items = {}  -- 地上的掉落物
-local cardController
-local inventoryController
-local characterUI
+local mapController
 local gameFont
 local gameTimer  -- 全局计时器实例
 local attackEffects = {}  -- 攻击效果数组
 local gameOver = false
 local gameOverTime = 0
+local buildingPreviewX, buildingPreviewY
+local buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
 
 function love.load()
     
@@ -40,14 +36,12 @@ function love.load()
     -- 初始化计时器
     gameTimer = Timer.new()
     
-    -- 初始化地图
-    map = Map:new()
+    -- 初始化地图控制器
+    mapController = MapController:new()
     
-    -- 初始化玩家
-    player = Player:new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
-    player:setMap(map)
-    player:setTimer(gameTimer)  -- 传递timer实例给Player对象
-    player:setAttackEffects(attackEffects)  -- 传递攻击特效数组给玩家
+    -- 初始化玩家控制器
+    player = PlayerController:new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
+    player:setMap(mapController.model)
     
     -- 初始化卡牌控制器
     cardController = CardController:new()
@@ -70,7 +64,8 @@ function love.update(dt)
     gameTimer:update(dt)
     
     -- 检查玩家是否死亡
-    if player.attributes.hp <= 0 then
+    local playerModel = player:getModel()
+    if playerModel.attributes.hp <= 0 then
         -- 玩家已死亡，游戏结束
         if not gameOver then
             gameOver = true
@@ -79,45 +74,45 @@ function love.update(dt)
         return  -- 停止其他更新
     end
     
+    -- 更新玩家控制器
+    player:update(dt, MonsterController.getInstances())
+    
     -- 更新游戏逻辑
     player:update(dt)
     
     -- 玩家自动攻击范围内的怪物
-    player:autoAttack(monsters)
+    player:autoAttack(MonsterController.getInstances())
     
     -- 更新所有建筑
-    for i = #buildings, 1, -1 do
-        local building = buildings[i]
-        building:update(dt, monsters)
-        
-        -- 如果建筑消失，从列表中移除
-        if building.status.isDead then
-            table.remove(buildings, i)
-        end
-    end
+    BuildingController.updateAll(dt)
     
-    -- 更新所有怪物并处理死亡
-    for i = #monsters, 1, -1 do
-        local monster = monsters[i]
-        monster:update(dt, map)
+    -- 更新所有怪物
+    MonsterController.updateAll(dt, mapController.model)
+    
+    -- 处理怪物死亡和掉落
+    for i = #MonsterController.instances, 1, -1 do
+        local monster = MonsterController.instances[i]
         
-        -- 如果怪物死亡
-        if monster.status.isDead then
+        -- 如果怪物已死亡但未被移除
+        if monster:isDead() then
+            local monsterModel = monster:getModel()
+            
             -- 生成掉落物
-            local drops = ItemSystem.Item.generateDrops(monster.type, monster.x, monster.y)
+            local drops = ItemSystem.Item.generateDrops(monsterModel.type, monsterModel.x, monsterModel.y)
             for _, drop in ipairs(drops) do
                 if drop.isCard then
                     -- 根据玩家等级检查是否可以获得该卡牌
                     local canGetCard = false
                     local cardType = drop.buildingCardType
+                    local playerModel = player:getModel()
                     
                     -- 根据怪物类型和玩家等级检查是否可以获得该卡牌
-                    if isMonsterInTier(monster.type, "basic") then
-                        canGetCard = player.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.basic
-                    elseif isMonsterInTier(monster.type, "advanced") then
-                        canGetCard = player.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.advanced
-                    elseif isMonsterInTier(monster.type, "elite") then
-                        canGetCard = player.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.elite
+                    if isMonsterInTier(monsterModel.type, "basic") then
+                        canGetCard = playerModel.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.basic
+                    elseif isMonsterInTier(monsterModel.type, "advanced") then
+                        canGetCard = playerModel.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.advanced
+                    elseif isMonsterInTier(monsterModel.type, "elite") then
+                        canGetCard = playerModel.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.elite
                     end
                     
                     if canGetCard then
@@ -133,31 +128,41 @@ function love.update(dt)
             end
             
             -- 给玩家经验值
-            player:gainExp(monster.config.expValue)
-            -- 移除怪物
-            table.remove(monsters, i)
-        else
-            -- 设置玩家为目标
-            monster:setTarget(player)
+            player:gainExp(monsterModel.expValue or monsterModel.config.expValue)
         end
     end
     
     -- 更新所有子弹
-    Monster.updateBullets(dt)
-    player:updateBullets(dt)
+    MonsterController.updateBullets(dt)
     
     -- 处理子弹碰撞
     local playerBullets = player:getBullets()
-    local monsterBullets = Monster.getBullets()
+    local monsterBullets = MonsterController.getBullets()
     
     -- 检查玩家子弹与怪物的碰撞
     for i = #playerBullets, 1, -1 do
         local bullet = playerBullets[i]
-        for _, monster in ipairs(monsters) do
-            if bullet:checkCollision(monster) then
-                monster:takeDamage(bullet.damage)
-                table.remove(playerBullets, i)
-                break
+        for _, monster in ipairs(MonsterController.instances) do
+            if not monster:isDead() and bullet.checkCollision then
+                local monsterPos = monster:getPosition()
+                local monsterEntity = {
+                    x = monsterPos.x, 
+                    y = monsterPos.y, 
+                    size = monster:getModel().size
+                }
+                
+                if bullet:checkCollision(monsterEntity) then
+                    monster:takeDamage(bullet.damage)
+                    
+                    -- 如果使用BulletController，使用其方法
+                    if bullet.deactivate then
+                        bullet:deactivate()
+                    else
+                        -- 兼容旧版本
+                        bullet.status.isActive = false
+                    end
+                    break
+                end
             end
         end
     end
@@ -165,9 +170,11 @@ function love.update(dt)
     -- 检查怪物子弹与玩家的碰撞
     for i = #monsterBullets, 1, -1 do
         local bullet = monsterBullets[i]
-        if bullet:checkCollision(player) then
+        local playerPos = player:getPosition()
+        local entity = {x = playerPos.x, y = playerPos.y, size = playerModel.size}
+        if bullet:checkCollision(entity) then
             player:takeDamage(bullet.damage)
-            table.remove(monsterBullets, i)
+            bullet.status.isActive = false
         end
     end
     
@@ -185,12 +192,10 @@ end
 
 function love.draw()
     -- 绘制地图
-    map:draw()
+    mapController:draw()
     
     -- 绘制所有建筑
-    for _, building in ipairs(buildings) do
-        building:draw()
-    end
+    BuildingController.drawAll()
     
     -- 绘制所有掉落物
     for _, item in ipairs(items) do
@@ -198,15 +203,13 @@ function love.draw()
     end
     
     -- 绘制所有怪物
-    for _, monster in ipairs(monsters) do
-        monster:draw()
-    end
+    MonsterController.drawAll()
     
     -- 绘制玩家
     player:draw()
     
     -- 绘制所有子弹
-    Monster.drawBullets()
+    MonsterController.drawBullets()
     
     -- 绘制攻击特效
     for _, effect in ipairs(attackEffects) do
@@ -248,7 +251,7 @@ function love.draw()
         love.graphics.setColor(1, 1, 1)
         font = love.graphics.newFont("assets/fonts/simsun.ttc", 20)
         love.graphics.setFont(font)
-        local statsText = string.format("等级: %d", player.attributes.level)
+        local statsText = string.format("等级: %d", playerModel.attributes.level)
         textWidth = font:getWidth(statsText)
         love.graphics.print(statsText, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 + 10)
         
@@ -270,16 +273,17 @@ end
 
 function drawUI()
     -- 绘制玩家属性
+    local playerModel = player:getModel()
     local statsY = 10
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print(string.format("等级: %d", player.attributes.level), 10, statsY)
-    love.graphics.print(string.format("经验: %d/%d", player.attributes.exp, player.attributes.nextLevelExp), 10, statsY + 20)
-    love.graphics.print(string.format("攻击: %d", player.attributes.attack), 10, statsY + 40)
-    love.graphics.print(string.format("防御: %d", player.attributes.defense), 10, statsY + 60)
+    love.graphics.print(string.format("等级: %d", playerModel.attributes.level), 10, statsY)
+    love.graphics.print(string.format("经验: %d/%d", playerModel.attributes.exp, playerModel.attributes.nextLevelExp), 10, statsY + 20)
+    love.graphics.print(string.format("攻击: %d", playerModel.attributes.attack), 10, statsY + 40)
+    love.graphics.print(string.format("防御: %d", playerModel.attributes.defense), 10, statsY + 60)
     
     -- 绘制建筑和怪物数量
-    love.graphics.print(string.format("建筑: %d", #buildings), 10, statsY + 80)
-    love.graphics.print(string.format("怪物: %d", #monsters), 10, statsY + 100)
+    love.graphics.print(string.format("建筑: %d", #BuildingController.instances), 10, statsY + 80)
+    love.graphics.print(string.format("怪物: %d", #MonsterController.instances), 10, statsY + 100)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
@@ -341,11 +345,11 @@ function love.mousepressed(x, y, button)
         if cardController.selectedCard and cardController.selectedCard.config then
             -- 检查点击位置是否在地图范围内且不在手牌区域
             if y < cardController.view.handArea.y then
-                local tileX = math.floor(x / map.tileSize) * map.tileSize + map.tileSize/2
-                local tileY = math.floor(y / map.tileSize) * map.tileSize + map.tileSize/2
+                local tileX = math.floor(x / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
+                local tileY = math.floor(y / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
 
                 -- 获取地形类型并进行判断
-                local terrain = map:getTerrainAt(tileX, tileY)
+                local terrain = mapController:getTerrainAt(tileX, tileY)
                 print("尝试在 x=" .. tileX .. ", y=" .. tileY .. " 放置建筑，地形类型: " .. (terrain or "nil"))
                 
                 -- 检查是否在玩家防御区域外
@@ -354,52 +358,53 @@ function love.mousepressed(x, y, button)
                     return
                 end
                 
-                -- 防止放置在水上（水的地形类型是2，参考config/terrain.lua）
-                if terrain and terrain ~= 2 then  -- TerrainConfig.TERRAIN_TYPES.WATER = 2
+                -- 检查地形是否适合该类型建筑
+                local buildingType = cardController.selectedCard.config.buildingType
+                if mapController:canBuildAt(tileX, tileY, buildingType) then
                     -- 创建新建筑
-                    local buildingType = cardController.selectedCard.config.buildingType
                     print("建筑类型: " .. (buildingType or "nil"))
                     
                     if buildingType then
-                        local building = Building:new(buildingType, tileX, tileY)
-                        
-                        -- 不再使用卡牌配置中的自定义属性，而是使用建筑配置中的默认值
-                        -- 重置剩余时间和生成计时器
-                        building.attributes.remainingTime = building.attributes.lifespan
-                        building.status.timeToNextSpawn = building.attributes.spawnRate
-                        
-                        -- 添加建筑到列表中
-                        table.insert(buildings, building)
-                        print("成功创建建筑，当前建筑数量: " .. #buildings)
+                        -- 使用BuildingController创建建筑
+                        BuildingController.createBuilding(buildingType, tileX, tileY)
+                        print("成功创建建筑，当前建筑数量: " .. #BuildingController.instances)
                         
                         -- 使用卡牌
                         cardController:removeCard(cardController.selectedCard)
                     end
+                else
+                    print("当前地形不适合建造此类型建筑")
                 end
             end
         end
     elseif button == 2 then  -- 右键点击
         -- 检查是否点击了怪物（尝试攻击）
-        for _, monster in ipairs(monsters) do
-            local dx = x - monster.x
-            local dy = y - monster.y
-            local distance = math.sqrt(dx * dx + dy * dy)
-            
-            if distance <= monster.config.size then
-                player:attack(monster)
-                return
+        for _, monster in ipairs(MonsterController.instances) do
+            if not monster:isDead() then
+                local monsterPos = monster:getPosition()
+                local monsterModel = monster:getModel()
+                local dx = x - monsterPos.x
+                local dy = y - monsterPos.y
+                local distance = math.sqrt(dx * dx + dy * dy)
+                
+                if distance <= monsterModel.size then
+                    player:attack(monster)
+                    return
+                end
             end
         end
         
         -- 检查是否点击了建筑（尝试攻击或拆除）
-        for _, building in ipairs(buildings) do
-            local dx = x - building.x
-            local dy = y - building.y
+        for _, building in ipairs(BuildingController.instances) do
+            local bx, by = building:getPosition()
+            local dx = x - bx
+            local dy = y - by
             local distance = math.sqrt(dx * dx + dy * dy)
+            local buildingModel = building:getModel()
             
-            if distance <= building.size * 1.5 then
+            if distance <= buildingModel.size * 1.5 then
                 -- 攻击建筑
-                building:takeDamage(player.attributes.attack)
+                building:takeDamage(player:getModel().attributes.attack)
                 return
             end
         end
@@ -417,15 +422,16 @@ function love.keypressed(key)
         if gameOver then
             -- 重新初始化游戏
             gameOver = false
-            monsters = {}
-            buildings = {}
+            
+            -- 清除所有建筑
+            BuildingController.clearAll()
+            
+            -- 初始化物品数组
             items = {}
             
             -- 重新初始化玩家
-            player = Player:new(0, 0)
-            player:setMap(map)
-            player:setTimer(gameTimer)
-            player:setAttackEffects(attackEffects)
+            player = PlayerController:new(0, 0)
+            player:setMap(mapController.model)
             
             -- 重新初始化卡牌
             cardController = CardController:new()
@@ -439,18 +445,23 @@ function love.keypressed(key)
             inventoryController = InventoryController:new(30)  -- 明确指定30格容量
             
             -- 重新生成地图
-            map:generate()
+            mapController:regenerate()
+            
+            -- 清除所有怪物
+            MonsterController.clearAll()
+            
             return
         end
         
         -- 在游戏中按R重新生成地图
-        map:generate()
+        mapController:regenerate()
     elseif key == 'a' then
         -- 切换AI控制
-        player:setAIControl(not player.status.isAIControlled)
+        player:setAIControl(not player.model.status.isAIControlled)
     elseif key == 'd' then
         -- 抽一张牌，根据玩家等级决定可以抽取的卡牌类型
-        local maxCardType = getMaxCardTypeByLevel(player.attributes.level)
+        local playerModel = player:getModel()
+        local maxCardType = getMaxCardTypeByLevel(playerModel.attributes.level)
         local cardType = math.random(1, maxCardType)
         cardController:addCard(cardType)
     end
@@ -477,5 +488,29 @@ function getMaxCardTypeByLevel(level)
         return 6  -- 基础和高级卡牌可用
     else
         return 3  -- 只有基础卡牌可用
+    end
+end
+
+-- 鼠标移动
+function love.mousemoved(x, y)
+    -- 更新建筑预览位置
+    if cardController:getSelectedIndex() and not inventoryController:isOpen() then
+        local buildingType = cardController:getSelectedBuildingType()
+        
+        if buildingType then
+            -- 检查是否可以在当前位置建造
+            local canBuild = player:canBuildAt(x, y) and mapController:canBuildAt(x, y, buildingType)
+            
+            -- 保存预览颜色
+            if canBuild then
+                buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
+            else
+                buildingPreviewColor = {1, 0.5, 0.5, 0.5}  -- 不可建造用红色表示
+            end
+            
+            -- 更新预览位置
+            buildingPreviewX = x
+            buildingPreviewY = y
+        end
     end
 end 
