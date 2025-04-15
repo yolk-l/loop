@@ -18,7 +18,7 @@ local function initFonts()
     end
 end
 
-function CardView:new()
+function CardView.new()
     initFonts()
     local mt = setmetatable({}, CardView)
     mt.handArea = {

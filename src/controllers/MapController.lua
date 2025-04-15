@@ -6,13 +6,13 @@ local MapModel = require('src/models/MapModel')
 local MapView = require('src/views/MapView')
 local TerrainConfig = require('config/terrain')
 
-function MapController:new()
-    local self = setmetatable({}, MapController)
-    self.model = MapModel:new()
-    self.view = MapView:new()
-    self:generateMap()
-    self:regenerate()
-    return self
+function MapController.new()
+    local mt = setmetatable({}, MapController)
+    mt.model = MapModel.new()
+    mt.view = MapView.new()
+    mt:generateMap()
+    mt:regenerate()
+    return mt
 end
 
 function MapController:draw()

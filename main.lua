@@ -3,12 +3,12 @@ local PlayerController = require('src/controllers/PlayerController')
 local MapController = require('src/controllers/MapController')
 local MonsterController = require('src/controllers/MonsterController')
 local BuildingController = require('src/controllers/BuildingController')
-local ItemSystem = require('src/utils/Item')
 local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
 local Timer = require('lib/timer')  -- 引入timer库
 local CombatManager = require('src/controllers/CombatManager')
+local TypeDefines = require('config/type_defines')
 
 -- 游戏状态
 local player
@@ -38,25 +38,30 @@ function love.load()
     gameTimer = Timer.new()
     
     -- 初始化地图控制器
-    mapController = MapController:new()
+    mapController = MapController.new()
     
     -- 初始化玩家控制器
-    player = PlayerController:new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
+    player = PlayerController.new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
     player:setMap(mapController.model)
     
     -- 初始化卡牌控制器
-    cardController = CardController:new()
+    cardController = CardController.new()
     
     -- 初始化背包控制器
-    inventoryController = InventoryController:new(30)  -- 明确指定30格容量
+    inventoryController = InventoryController.new(30)  -- 明确指定30格容量
     
     -- 初始化角色界面
-    characterUI = CharacterUI:new()
+    characterUI = CharacterUI.new()
     
     -- 初始化手牌
+    local initCardTypes = {
+        TypeDefines.CARD_TYPES.SLIME_NEST,
+        TypeDefines.CARD_TYPES.GOBLIN_HUT,
+        TypeDefines.CARD_TYPES.SKELETON_TOMB,
+    }
     for _ = 1, 3 do
-        local cardType = math.random(1, 3)  -- 改为1-9，包含所有9种建筑卡牌
-        cardController:addCard(cardType)
+        local idx = math.random(1, 3)  -- 改为1-9，包含所有9种建筑卡牌
+        cardController:addCard(initCardTypes[idx])
     end
 end
 
@@ -117,15 +122,8 @@ function love.update(dt)
     -- 更新所有怪物
     MonsterController.updateAll(dt, mapController.model)
     
-    -- 处理怪物死亡和掉落
-    for i = #MonsterController.instances, 1, -1 do
-        local monster = MonsterController.instances[i]
-        
-        -- 如果怪物已死亡但未被移除
-        if monster:isDead() then
-            CombatManager:handleMonsterDeath(monster, player, inventoryController, cardController)
-        end
-    end
+    -- 处理怪物死亡和移除
+    CombatManager:processDeadMonsters(MonsterController, player, inventoryController, cardController)
     
     -- 更新所有子弹
     MonsterController.updateBullets(dt)
@@ -247,36 +245,17 @@ function love.mousepressed(x, y, button)
             if selectedItem then
                 local slot = characterUI:getSlotAt(x, y)
                 if slot then
-                    -- 检查物品类型是否为符文
-                    local canEquip = selectedItem.isRune
-                    
-                    if canEquip then
-                        -- 检查符文位置是否匹配槽位
-                        if selectedItem.position ~= slot then
-                            print("符文位置不匹配，无法装备")
-                            return
-                        end
-                        
-                        -- 尝试装备符文
-                        local oldRune = player:equipRune(selectedItem)
-                        if oldRune then
-                            -- 将旧符文放回背包
-                            inventoryController:addItem(oldRune)
-                        end
-                        -- 从背包移除已装备的物品
-                        inventoryController:removeItem(inventoryController.model.selected)
-                    end
+                    -- 符文系统已移除，不再处理符文装备
+                    print("符文系统已移除")
                     return
                 end
             end
             
             -- 检查是否点击了已装备的物品（卸下装备）
             local slot = characterUI:getSlotAt(x, y)
-            if slot and player.runes[slot] then
-                local rune = player.runes[slot]
-                if inventoryController:addItem(rune) then
-                    player:unequipRune(slot)
-                end
+            if slot then
+                -- 符文系统已移除，不再处理符文卸下
+                print("符文系统已移除")
                 return
             end
         end
@@ -376,11 +355,11 @@ function love.keypressed(key)
             BuildingController.clearAll()
             
             -- 重新初始化玩家
-            player = PlayerController:new(0, 0)
+            player = PlayerController.new(0, 0)
             player:setMap(mapController.model)
             
             -- 重新初始化卡牌
-            cardController = CardController:new()
+            cardController = CardController.new()
             for i = 1, 3 do
                 -- 新游戏只给基础卡牌
                 local cardType = math.random(1, 3)  -- 只用基础卡牌 1-3
@@ -388,7 +367,7 @@ function love.keypressed(key)
             end
             
             -- 重新初始化背包
-            inventoryController = InventoryController:new(30)  -- 明确指定30格容量
+            inventoryController = InventoryController.new(30)  -- 明确指定30格容量
             
             -- 重新生成地图
             mapController:regenerate()
@@ -406,34 +385,13 @@ function love.keypressed(key)
         player:setAIControl(not player.model.status.isAIControlled)
     elseif key == 'd' then
         -- 抽一张牌，根据玩家等级决定可以抽取的卡牌类型
-        local playerModel = player:getModel()
-        local maxCardType = getMaxCardTypeByLevel(playerModel.attributes.level)
-        local cardType = math.random(1, maxCardType)
-        cardController:addCard(cardType)
-    end
-end
-
--- 检查怪物是否属于指定层级
-function isMonsterInTier(monsterType, tierName)
-    local monsterTiers = ItemSystem.MONSTER_TIERS
-    if monsterTiers[tierName] then
-        for _, monster in ipairs(monsterTiers[tierName]) do
-            if monster == monsterType then
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- 根据玩家等级获取最高可用卡牌类型编号
-function getMaxCardTypeByLevel(level)
-    if level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.elite then
-        return 9  -- 所有卡牌都可用
-    elseif level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.advanced then
-        return 6  -- 基础和高级卡牌可用
-    else
-        return 3  -- 只有基础卡牌可用
+        local cardTypes = {
+            TypeDefines.CARD_TYPES.SLIME_NEST,
+            TypeDefines.CARD_TYPES.GOBLIN_HUT,
+            TypeDefines.CARD_TYPES.SKELETON_TOMB,
+        }
+        local idx = math.random(1, #cardTypes)
+        cardController:addCard(cardTypes[idx])
     end
 end
 

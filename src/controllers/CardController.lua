@@ -5,12 +5,12 @@ CardController.__index = CardController
 -- 引入卡牌模型和视图
 local CardModel = require('src/models/CardModel')
 local CardView = require('src/views/CardView')
-local cardConfig = require('config/cards')
+local TypeDefines = require('config/type_defines')
 
-function CardController:new()
+function CardController.new()
     local mt = setmetatable({}, CardController)
-    mt.model = CardModel:new()
-    mt.view = CardView:new()
+    mt.model = CardModel.new()
+    mt.view = CardView.new()
     return mt
 end
 
@@ -71,7 +71,7 @@ end
 
 -- 外部接口以访问 CARD_TYPES
 function CardController:getCardTypes()
-    return cardConfig.CARD_TYPES
+    return TypeDefines.CARD_TYPES
 end
 
 function CardController:getSelectedCard()

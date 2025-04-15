@@ -10,7 +10,7 @@ local function loadBulletImage()
     bulletImage = love.graphics.newImage("assets/sprites/bullets/normal_bullet.png")
 end
 
-function BulletView:new()
+function BulletView.new()
     local self = setmetatable({}, BulletView)
     
     -- 确保子弹图片已加载
@@ -22,37 +22,39 @@ function BulletView:new()
 end
 
 function BulletView:draw(bulletModel)
-    if not bulletModel.status.isActive then return end
+    if not bulletModel:isActive() then return end
     
     -- 暴击子弹使用不同颜色
-    if bulletModel.effects.isCritical then
+    local effects = bulletModel:getEffects()
+    local position = bulletModel:getPosition()
+    local direction = bulletModel:getDirection()
+    local sourceType = bulletModel:getSource()
+    local radius = bulletModel:getRadius()
+    
+    if effects.isCritical then
         love.graphics.setColor(1, 0.2, 0.2)  -- 暴击用红色
     else
-        -- 根据发射源设置不同颜色
-        if bulletModel.sourceType == "player" then
-            love.graphics.setColor(1, 0.7, 0.3)  -- 玩家子弹为橙色
-        else
-            love.graphics.setColor(0.3, 0.7, 1)  -- 怪物子弹为蓝色
-        end
+        -- 所有普通子弹都使用黑色
+        love.graphics.setColor(0, 0, 0)  -- 黑色
     end
     
     -- 使用图片或简单图形绘制子弹
     if bulletImage then
         local scale = 0.5
-        love.graphics.draw(bulletImage, bulletModel.x, bulletModel.y, 
-                          math.atan2(bulletModel.dirY, bulletModel.dirX),  -- 旋转角度
+        love.graphics.draw(bulletImage, position.x, position.y, 
+                          math.atan2(direction.y, direction.x),  -- 旋转角度
                           scale, scale,  -- 缩放
                           bulletImage:getWidth()/2, bulletImage:getHeight()/2)  -- 锚点
     else
         -- 使用简单图形绘制子弹
-        love.graphics.circle('fill', bulletModel.x, bulletModel.y, bulletModel.radius)
+        love.graphics.circle('fill', position.x, position.y, radius)
     end
     
     -- 添加子弹轨迹效果
-    love.graphics.setColor(1, 1, 1, 0.3)
-    love.graphics.line(bulletModel.x, bulletModel.y, 
-                      bulletModel.x - bulletModel.dirX * 10, 
-                      bulletModel.y - bulletModel.dirY * 10)
+    love.graphics.setColor(0, 0, 0, 0.2)  -- 黑色轨迹，透明度0.2
+    love.graphics.line(position.x, position.y, 
+                      position.x - direction.x * 10, 
+                      position.y - direction.y * 10)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)

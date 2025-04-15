@@ -10,10 +10,10 @@ local BulletController = require('src/controllers/BulletController')
 MonsterController.instances = {}
 MonsterController.bullets = {}
 
-function MonsterController:new(type, x, y)
+function MonsterController.new(type, x, y)
     local mt = setmetatable({}, MonsterController)
-    mt.model = MonsterModel:new(type, x, y)
-    mt.view = MonsterView:new()
+    mt.model = MonsterModel.new(type, x, y)
+    mt.view = MonsterView.new()
     
     -- 添加到实例列表
     table.insert(MonsterController.instances, mt)
@@ -60,7 +60,7 @@ function MonsterController:heal(amount)
 end
 
 function MonsterController:createBullet(bulletInfo)
-    local bullet = BulletController:new(
+    local bullet = BulletController.new(
         bulletInfo.startX,
         bulletInfo.startY,
         bulletInfo.targetX,
@@ -75,7 +75,7 @@ function MonsterController:createBullet(bulletInfo)
 end
 
 function MonsterController:isDead()
-    return self.model.status.isDead
+    return self.model:isDead()
 end
 
 function MonsterController:getPosition()
@@ -93,14 +93,22 @@ function MonsterController.updateAll(dt, map)
         local instance = MonsterController.instances[i]
         instance:update(dt, map)
         
-        -- 移除已死亡的怪物
-        if instance:isDead() then
-            table.remove(MonsterController.instances, i)
-        end
+        -- 标记已死亡的怪物，但不立即移除
+        -- 移除操作将在main.lua中处理完经验值和掉落后进行
     end
     
     -- 更新所有子弹
     MonsterController.updateBullets(dt)
+end
+
+-- 静态方法：移除所有标记为死亡的怪物
+function MonsterController.removeDeadMonsters()
+    for i = #MonsterController.instances, 1, -1 do
+        local instance = MonsterController.instances[i]
+        if instance:isDead() then
+            table.remove(MonsterController.instances, i)
+        end
+    end
 end
 
 -- 静态方法：绘制所有怪物实例
@@ -151,7 +159,7 @@ end
 
 -- 静态方法：创建怪物
 function MonsterController.createMonster(type, x, y)
-    return MonsterController:new(type, x, y)
+    return MonsterController.new(type, x, y)
 end
 
 return MonsterController 

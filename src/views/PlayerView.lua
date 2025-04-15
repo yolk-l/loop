@@ -17,13 +17,13 @@ local function initFont()
     end
 end
 
-function PlayerView:new()
+function PlayerView.new()
     initFont()
-    local self = setmetatable({}, PlayerView)
-    self.bulletImage = nil
-    self.playerFont = nil
-    self:loadResources()
-    return self
+    local mt = setmetatable({}, PlayerView)
+    mt.bulletImage = nil
+    mt.playerFont = nil
+    mt:loadResources()
+    return mt
 end
 
 function PlayerView:loadResources()
@@ -93,31 +93,6 @@ function PlayerView:draw(playerModel)
         love.graphics.setColor(0.2, 0.8, 0.2)
         love.graphics.circle('fill', playerModel.x, playerModel.y - playerModel.size - 20, 3)
     end
-    
-    -- 绘制符文状态指示器
-    local offset = -15
-    for i = 1, 6 do
-        if playerModel.runes[i] then
-            -- 使用符文对应的颜色
-            love.graphics.setColor(unpack(playerModel.runes[i].color))
-            -- 添加品质边框
-            love.graphics.circle('fill', playerModel.x + offset, playerModel.y - playerModel.size - 16, 3)
-            love.graphics.setColor(unpack(playerModel.runes[i].qualityColor))
-            love.graphics.circle('line', playerModel.x + offset, playerModel.y - playerModel.size - 16, 3)
-        else
-            -- 空符文槽用灰色表示
-            love.graphics.setColor(0.5, 0.5, 0.5, 0.3)
-            love.graphics.circle('fill', playerModel.x + offset, playerModel.y - playerModel.size - 16, 2)
-        end
-        offset = offset + 6
-    end
-    
-    -- 绘制激活的套装效果指示器
-    if #playerModel.activeRuneSets > 0 then
-        love.graphics.setColor(1, 0.8, 0.2) -- 金色
-        love.graphics.circle('fill', playerModel.x, playerModel.y - playerModel.size - 25, 3)
-    end
-    
     -- 如果处于攻击状态，绘制攻击效果
     if playerModel.status.isAttacking then
         love.graphics.setColor(1, 0.7, 0.2, 0.6)

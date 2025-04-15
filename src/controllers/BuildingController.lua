@@ -9,18 +9,18 @@ local MonsterController = require('src/controllers/MonsterController')
 -- 静态变量，用于管理所有建筑实例
 BuildingController.instances = {}
 
-function BuildingController:new(type, x, y)
-    local self = setmetatable({}, BuildingController)
-    self.model = BuildingModel:new(type, x, y)
-    self.view = BuildingView:new()
+function BuildingController.new(type, x, y)
+    local mt = setmetatable({}, BuildingController)
+    mt.model = BuildingModel.new(type, x, y)
+    mt.view = BuildingView.new()
     
     -- 加载并设置图像尺寸数据
-    self.view:loadImage(self.model)
+    mt.view:loadImage(mt.model)
     
     -- 添加到实例列表
-    table.insert(BuildingController.instances, self)
+    table.insert(BuildingController.instances, mt)
     
-    return self
+    return mt
 end
 
 function BuildingController:update(dt, player)
@@ -41,7 +41,7 @@ function BuildingController:spawnMonster(player)
     local spawnX, spawnY = self.model:getSpawnPosition()
     
     -- 创建新怪物实例
-    local monsterController = MonsterController:new(
+    local monsterController = MonsterController.new(
         self.model:getMonsterType(), 
         spawnX, 
         spawnY
@@ -148,7 +148,7 @@ end
 
 -- 静态方法：创建建筑
 function BuildingController.createBuilding(type, x, y)
-    return BuildingController:new(type, x, y)
+    return BuildingController.new(type, x, y)
 end
 
 return BuildingController 

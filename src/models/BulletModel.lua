@@ -2,54 +2,46 @@
 local BulletModel = {}
 BulletModel.__index = BulletModel
 
-function BulletModel:new(startX, startY, targetX, targetY, speed, damage, sourceType)
-    local self = setmetatable({}, BulletModel)
-    
-    -- 位置信息
-    self.x = startX
-    self.y = startY
-    self.startX = startX
-    self.startY = startY
-    self.targetX = targetX
-    self.targetY = targetY
+function BulletModel.new(startX, startY, targetX, targetY, speed, damage, sourceType)
     
     -- 计算方向
     local dx = targetX - startX
     local dy = targetY - startY
     local distance = math.sqrt(dx * dx + dy * dy)
-    
+    local dirX, dirY
     -- 如果目标就在起点，给一个默认方向
     if distance == 0 then
-        self.dirX = 1
-        self.dirY = 0
+        dirX = 1
+        dirY = 0
     else
-        self.dirX = dx / distance
-        self.dirY = dy / distance
+        dirX = dx / distance
+        dirY = dy / distance
     end
-    
-    -- 属性
-    self.speed = speed or 300
-    self.damage = damage or 10
-    self.sourceType = sourceType or "player"  -- 发射源类型：player或monster
-    self.maxDistance = distance              -- 最大飞行距离
-    self.distanceTraveled = 0                -- 已飞行距离
-    
-    -- 状态
-    self.status = {
-        isActive = true  -- 子弹是否有效
-    }
-    
-    -- 特效
-    self.effects = {
-        isCritical = false,    -- 是否暴击
-        stunChance = 0,        -- 眩晕几率
-        lifeSteal = 0          -- 生命偷取比例
-    }
-    
-    -- 碰撞检测参数
-    self.radius = 3  -- 子弹碰撞半径
-    
-    return self
+    local mt = setmetatable({
+        x = startX,
+        y = startY,
+        startX = startX,
+        startY = startY,
+        targetX = targetX,
+        targetY = targetY,
+        dirX = dirX,
+        dirY = dirY,
+        speed = speed or 300,
+        damage = damage or 10,
+        sourceType = sourceType or "player",
+        maxDistance = distance,
+        distanceTraveled = 0,
+        radius = 3,
+        status = {
+            isActive = true  -- 子弹是否有效
+        },
+        effects = {
+            isCritical = false,    -- 是否暴击
+            stunChance = 0,        -- 眩晕几率
+            lifeSteal = 0          -- 生命偷取比例
+        }
+    }, BulletModel)
+    return mt
 end
 
 function BulletModel:update(dt)
@@ -71,6 +63,14 @@ end
 
 function BulletModel:getPosition()
     return {x = self.x, y = self.y}
+end
+
+function BulletModel:getDirection()
+    return {x = self.dirX, y = self.dirY}
+end
+
+function BulletModel:getRadius()
+    return self.radius
 end
 
 function BulletModel:getSource()

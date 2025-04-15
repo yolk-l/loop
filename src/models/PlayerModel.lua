@@ -3,10 +3,10 @@ local PlayerModel = {}
 PlayerModel.__index = PlayerModel
 
 -- 引入物品系统和地形配置
-local ItemSystem = require('src/utils/Item')
 local TerrainConfig = require('config/terrain')
+local TypeDefines = require('config/type_defines')
 
-function PlayerModel:new(x, y)
+function PlayerModel.new(x, y)
     local self = setmetatable({}, PlayerModel)
     self.x = x
     self.y = y
@@ -37,20 +37,6 @@ function PlayerModel:new(x, y)
         accuracy = 0,      -- 命中率（百分比）
         resistance = 0     -- 抵抗率（百分比）
     }
-    
-    -- 符文系统（替代原来的装备栏）
-    self.runes = {
-        [1] = nil,  -- 位置1 (右上)
-        [2] = nil,  -- 位置2 (右中)
-        [3] = nil,  -- 位置3 (右下)
-        [4] = nil,  -- 位置4 (左上)
-        [5] = nil,  -- 位置5 (左中)
-        [6] = nil   -- 位置6 (左下)
-    }
-    
-    -- 激活的套装效果
-    self.activeRuneSets = {}
-    
     -- 状态系统
     self.status = {
         isAttacking = false,  -- 是否在攻击中
@@ -65,26 +51,12 @@ function PlayerModel:new(x, y)
         wanderY = nil,        -- 随机移动目标Y
         detectRange = 150     -- 检测范围
     }
-    
-    -- 符文属性加成记录
-    self.runeBonuses = {
-        maxHp = {flat = 0, percent = 0},
-        attack = {flat = 0, percent = 0},
-        defense = {flat = 0, percent = 0},
-        speed = {flat = 0, percent = 0},
-        critRate = 0,
-        critDamage = 0,
-        accuracy = 0,
-        resistance = 0
-    }
-    
     -- 战斗增强效果
     self.combatEffects = {
         extraTurnChance = 0,   -- 额外回合几率
         stunChance = 0,        -- 眩晕敌人几率
         lifeSteal = 0          -- 生命偷取百分比
     }
-    
     return self
 end
 
@@ -384,234 +356,6 @@ function PlayerModel:updateAI(dt, monsters)
     return false  -- 没有进行攻击
 end
 
-function PlayerModel:updateRuneBonuses()
-    -- 保存旧的最大生命值和当前生命值比例
-    local oldMaxHp = self.attributes.maxHp
-    local hpRatio = self.attributes.hp / oldMaxHp
-    
-    -- 重置基础属性
-    self.attributes.attack = 15 + (self.attributes.level - 1) * 5
-    self.attributes.defense = 5 + (self.attributes.level - 1) * 2
-    self.attributes.speed = 80
-    self.attributes.maxHp = 100 + (self.attributes.level - 1) * 20
-    self.attributes.critRate = 5
-    self.attributes.critDamage = 50
-    self.attributes.accuracy = 0
-    self.attributes.resistance = 0
-    
-    -- 重置符文加成记录
-    self.runeBonuses = {
-        maxHp = {flat = 0, percent = 0},
-        attack = {flat = 0, percent = 0},
-        defense = {flat = 0, percent = 0},
-        speed = {flat = 0, percent = 0},
-        critRate = 0,
-        critDamage = 0,
-        accuracy = 0,
-        resistance = 0
-    }
-    
-    -- 重置战斗效果
-    self.combatEffects = {
-        extraTurnChance = 0,
-        stunChance = 0,
-        lifeSteal = 0
-    }
-    
-    -- 重置激活的套装效果
-    self.activeRuneSets = {}
-    
-    -- 应用符文主属性和次属性加成
-    for position, rune in pairs(self.runes) do
-        if rune then
-            -- 应用主属性
-            self:applyRuneStat(rune.primaryStat)
-            
-            -- 应用次属性
-            for _, stat in ipairs(rune.subStats) do
-                self:applyRuneStat(stat)
-            end
-        end
-    end
-    
-    -- 计算激活的套装效果
-    local setCounts = self:countRuneSetTypes()
-    local ItemConfig = require('config/items')
-    
-    for setType, count in pairs(setCounts) do
-        local setEffect = ItemConfig.RUNE_SET_EFFECTS[setType]
-        if setEffect and count >= setEffect.count then
-            -- 激活套装效果
-            table.insert(self.activeRuneSets, {
-                name = setEffect.name,
-                effect = setEffect.effect,
-                count = count
-            })
-            
-            -- 应用套装效果
-            self:applySetEffect(setEffect.effect)
-        end
-    end
-    
-    -- 计算百分比加成（在应用所有固定值后）
-    if self.runeBonuses.maxHp.percent > 0 then
-        self.attributes.maxHp = math.floor(self.attributes.maxHp * (1 + self.runeBonuses.maxHp.percent/100))
-    end
-    if self.runeBonuses.attack.percent > 0 then
-        self.attributes.attack = math.floor(self.attributes.attack * (1 + self.runeBonuses.attack.percent/100))
-    end
-    if self.runeBonuses.defense.percent > 0 then
-        self.attributes.defense = math.floor(self.attributes.defense * (1 + self.runeBonuses.defense.percent/100))
-    end
-    if self.runeBonuses.speed.percent > 0 then
-        self.attributes.speed = math.floor(self.attributes.speed * (1 + self.runeBonuses.speed.percent/100))
-    end
-    
-    -- 按照相同比例调整当前生命值
-    self.attributes.hp = math.floor(self.attributes.maxHp * hpRatio)
-end
-
-function PlayerModel:applyRuneStat(stat)
-    local ItemConfig = require('config/items')
-    
-    if stat.type == ItemConfig.RUNE_PRIMARY_STATS.HP_FLAT then
-        self.attributes.maxHp = self.attributes.maxHp + stat.value
-        self.runeBonuses.maxHp.flat = self.runeBonuses.maxHp.flat + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.HP_PERCENT then
-        self.runeBonuses.maxHp.percent = self.runeBonuses.maxHp.percent + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.ATK_FLAT then
-        self.attributes.attack = self.attributes.attack + stat.value
-        self.runeBonuses.attack.flat = self.runeBonuses.attack.flat + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.ATK_PERCENT then
-        self.runeBonuses.attack.percent = self.runeBonuses.attack.percent + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.DEF_FLAT then
-        self.attributes.defense = self.attributes.defense + stat.value
-        self.runeBonuses.defense.flat = self.runeBonuses.defense.flat + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.DEF_PERCENT then
-        self.runeBonuses.defense.percent = self.runeBonuses.defense.percent + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.SPEED_FLAT then
-        self.attributes.speed = self.attributes.speed + stat.value
-        self.runeBonuses.speed.flat = self.runeBonuses.speed.flat + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.CRIT_RATE then
-        self.attributes.critRate = self.attributes.critRate + stat.value
-        self.runeBonuses.critRate = self.runeBonuses.critRate + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.CRIT_DMG then
-        self.attributes.critDamage = self.attributes.critDamage + stat.value
-        self.runeBonuses.critDamage = self.runeBonuses.critDamage + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.ACCURACY then
-        self.attributes.accuracy = self.attributes.accuracy + stat.value
-        self.runeBonuses.accuracy = self.runeBonuses.accuracy + stat.value
-    elseif stat.type == ItemConfig.RUNE_PRIMARY_STATS.RESISTANCE then
-        self.attributes.resistance = self.attributes.resistance + stat.value
-        self.runeBonuses.resistance = self.runeBonuses.resistance + stat.value
-    end
-end
-
-function PlayerModel:applySetEffect(effect)
-    if effect.type == "atk_percent" then
-        self.runeBonuses.attack.percent = self.runeBonuses.attack.percent + effect.value
-    elseif effect.type == "crit_rate" then
-        self.attributes.critRate = self.attributes.critRate + effect.value
-        self.runeBonuses.critRate = self.runeBonuses.critRate + effect.value
-    elseif effect.type == "speed" then
-        self.runeBonuses.speed.percent = self.runeBonuses.speed.percent + effect.value
-    elseif effect.type == "accuracy" then
-        self.attributes.accuracy = self.attributes.accuracy + effect.value
-        self.runeBonuses.accuracy = self.runeBonuses.accuracy + effect.value
-    elseif effect.type == "def_percent" then
-        self.runeBonuses.defense.percent = self.runeBonuses.defense.percent + effect.value
-    elseif effect.type == "resistance" then
-        self.attributes.resistance = self.attributes.resistance + effect.value
-        self.runeBonuses.resistance = self.runeBonuses.resistance + effect.value
-    elseif effect.type == "extra_turn" then
-        self.combatEffects.extraTurnChance = self.combatEffects.extraTurnChance + effect.value
-    elseif effect.type == "crit_dmg" then
-        self.attributes.critDamage = self.attributes.critDamage + effect.value
-        self.runeBonuses.critDamage = self.runeBonuses.critDamage + effect.value
-    elseif effect.type == "stun_chance" then
-        self.combatEffects.stunChance = self.combatEffects.stunChance + effect.value
-    elseif effect.type == "lifesteal" then
-        self.combatEffects.lifeSteal = self.combatEffects.lifeSteal + effect.value
-    elseif effect.type == "all_stats" then
-        -- 所有属性百分比增加
-        self.runeBonuses.maxHp.percent = self.runeBonuses.maxHp.percent + effect.value
-        self.runeBonuses.attack.percent = self.runeBonuses.attack.percent + effect.value
-        self.runeBonuses.defense.percent = self.runeBonuses.defense.percent + effect.value
-        self.runeBonuses.speed.percent = self.runeBonuses.speed.percent + effect.value
-        self.attributes.critRate = self.attributes.critRate + effect.value
-        self.runeBonuses.critRate = self.runeBonuses.critRate + effect.value
-        self.attributes.critDamage = self.attributes.critDamage + effect.value * 2  -- 暴击伤害加倍收益
-        self.runeBonuses.critDamage = self.runeBonuses.critDamage + effect.value * 2
-    end
-end
-
--- 以下是符文系统相关方法
-
--- 装备符文
-function PlayerModel:equipRune(rune, position)
-    -- 检查符文是否能装备到指定位置
-    if position and position ~= rune.position then
-        -- 只能装备到符文对应的位置
-        return nil
-    end
-    
-    -- 使用符文自带的位置
-    position = rune.position
-    
-    -- 保存当前装备
-    local oldRune = self.runes[position]
-    
-    -- 装备新符文
-    self.runes[position] = rune
-    
-    -- 更新符文属性加成
-    self:updateRuneBonuses()
-    
-    -- 返回旧符文
-    return oldRune
-end
-
--- 卸下符文
-function PlayerModel:unequipRune(position)
-    if not self.runes[position] then
-        return nil
-    end
-    
-    local rune = self.runes[position]
-    self.runes[position] = nil
-    
-    -- 更新符文属性加成
-    self:updateRuneBonuses()
-    
-    return rune
-end
-
--- 获取装备符文数量
-function PlayerModel:getEquippedRuneCount()
-    local count = 0
-    for i = 1, 6 do
-        if self.runes[i] then
-            count = count + 1
-        end
-    end
-    return count
-end
-
--- 计算套装激活数量
-function PlayerModel:countRuneSetTypes()
-    local setCounts = {}
-    
-    -- 计算每种套装类型的数量
-    for i = 1, 6 do
-        if self.runes[i] and self.runes[i].setType then
-            local setType = self.runes[i].setType
-            setCounts[setType] = (setCounts[setType] or 0) + 1
-        end
-    end
-    
-    return setCounts
-end
-
 -- 添加子弹
 function PlayerModel:addBullet(bullet)
     table.insert(self.bullets, bullet)
@@ -621,7 +365,7 @@ end
 function PlayerModel:updateBullets(dt)
     for i = #self.bullets, 1, -1 do
         self.bullets[i]:update(dt)
-        if not self.bullets[i].status.isActive then
+        if not self.bullets[i]:isActive() then
             table.remove(self.bullets, i)
         end
     end
@@ -635,6 +379,16 @@ end
 -- 获取位置信息
 function PlayerModel:getPosition()
     return {x = self.x, y = self.y}
+end
+
+-- 获取玩家大小
+function PlayerModel:getSize()
+    return self.size
+end
+
+-- 获取玩家等级
+function PlayerModel:getLevel()
+    return self.attributes.level
 end
 
 -- 设置位置

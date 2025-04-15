@@ -3,29 +3,20 @@ local CombatManager = {}
 CombatManager.__index = CombatManager
 
 local ItemSystem = require('src/utils/Item')
+local ItemConfig = require('config/items')
 
 function CombatManager:handleMonsterDeath(monster, player, inventoryController, cardController)
     local monsterModel = monster:getModel()
-    
     -- 生成掉落物
-    local drops = ItemSystem.Item.generateDrops(monsterModel.type, monsterModel.x, monsterModel.y)
+    local drops = ItemSystem.generateDrops(monsterModel:getType(), monsterModel:getPosition().x, monsterModel:getPosition().y)
     for _, drop in ipairs(drops) do
         if drop.isCard then
             -- 根据玩家等级检查是否可以获得该卡牌
-            local canGetCard = false
             local cardType = drop.buildingCardType
             local playerModel = player:getModel()
-            
-            -- 根据怪物类型和玩家等级检查是否可以获得该卡牌
-            if isMonsterInTier(monsterModel.type, "basic") then
-                canGetCard = playerModel.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.basic
-            elseif isMonsterInTier(monsterModel.type, "advanced") then
-                canGetCard = playerModel.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.advanced
-            elseif isMonsterInTier(monsterModel.type, "elite") then
-                canGetCard = playerModel.attributes.level >= ItemSystem.CARD_LEVEL_REQUIREMENTS.elite
-            end
-            
-            if canGetCard then
+            local playerLevel = playerModel:getLevel()
+
+            if playerLevel >= ItemConfig.CARD_LEVEL_REQUIREMENTS[monsterModel:getTier()] then
                 cardController:addCard(cardType)
             end
         else
@@ -38,7 +29,8 @@ function CombatManager:handleMonsterDeath(monster, player, inventoryController, 
     end
     
     -- 给玩家经验值
-    player:gainExp(monsterModel.expValue or monsterModel.config.expValue)
+    local expValue = monsterModel:getExpValue() or monsterModel:getConfig().expValue
+    player:gainExp(expValue)
 end
 
 function CombatManager:handlePlayerDeath(player)
@@ -54,6 +46,22 @@ function CombatManager:handlePlayerDeath(player)
     return false
 end
 
+-- 集中处理怪物死亡和移除
+function CombatManager:processDeadMonsters(monsterController, player, inventoryController, cardController)
+    -- 处理怪物死亡和掉落
+    for i = #monsterController.instances, 1, -1 do
+        local monster = monsterController.instances[i]
+        
+        -- 如果怪物已死亡但未被移除
+        if monster:isDead() then
+            self:handleMonsterDeath(monster, player, inventoryController, cardController)
+        end
+    end
+    
+    -- 移除已死亡的怪物
+    monsterController.removeDeadMonsters()
+end
+
 function CombatManager:handleBulletCollisions(player, monsterController)
     local playerBullets = player:getBullets()
     local monsterBullets = monsterController.getBullets()
@@ -67,18 +75,18 @@ function CombatManager:handleBulletCollisions(player, monsterController)
                 local monsterEntity = {
                     x = monsterPos.x, 
                     y = monsterPos.y, 
-                    size = monster:getModel().size
+                    size = monster:getModel():getSize()
                 }
                 
                 if bullet:checkCollision(monsterEntity) then
-                    monster:takeDamage(bullet.damage)
+                    monster:takeDamage(bullet:getDamage())
                     
                     -- 如果使用BulletController，使用其方法
                     if bullet.deactivate then
                         bullet:deactivate()
                     else
-                        -- 兼容旧版本
-                        bullet.status.isActive = false
+                        -- 兼容旧版本，尝试直接调用deactivate方法
+                        bullet:deactivate()
                     end
                     break
                 end
@@ -90,10 +98,10 @@ function CombatManager:handleBulletCollisions(player, monsterController)
     for i = #monsterBullets, 1, -1 do
         local bullet = monsterBullets[i]
         local playerPos = player:getPosition()
-        local entity = {x = playerPos.x, y = playerPos.y, size = player:getModel().size}
+        local entity = {x = playerPos.x, y = playerPos.y, size = player:getModel():getSize()}
         if bullet:checkCollision(entity) then
-            player:takeDamage(bullet.damage)
-            bullet.status.isActive = false
+            player:takeDamage(bullet:getDamage())
+            bullet:deactivate()
         end
     end
 end

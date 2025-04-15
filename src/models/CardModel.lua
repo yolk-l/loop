@@ -4,8 +4,9 @@ CardModel.__index = CardModel
 
 -- 引入配置
 local CardConfig = require('config/cards')
+local TypeDefines = require('config/type_defines')
 
-function CardModel:new()
+function CardModel.new()
     local mt = setmetatable({}, CardModel)
     mt.cards = {}  -- 玩家拥有的卡牌
     mt.hand = {}   -- 玩家手牌
@@ -34,16 +35,10 @@ function CardModel:addCardToHand(cardType)
     if #self.hand >= self.handSize then
         return false
     end
-    
-    -- 判断卡牌类型的有效性
-    if cardType < 1 or cardType > #CardConfig.CARD_TYPES then
-        cardType = math.random(1, #CardConfig.CARD_TYPES)
-    end
-    
     -- 创建新卡牌数据
     local card = {
         type = cardType,
-        config = CardConfig.CARD_CONFIG[cardType],
+        config = CardConfig[cardType],
         width = 100,
         height = 150,
         selected = false

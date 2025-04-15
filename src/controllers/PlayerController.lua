@@ -4,12 +4,12 @@ PlayerController.__index = PlayerController
 
 local PlayerModel = require('src/models/PlayerModel')
 local PlayerView = require('src/views/PlayerView')
-local BulletModel = require('src/models/BulletModel')
+local BulletController = require('src/controllers/BulletController')
 
-function PlayerController:new(x, y)
+function PlayerController.new(x, y)
     local mt = setmetatable({}, PlayerController)
-    mt.model = PlayerModel:new(x, y)
-    mt.view = PlayerView:new()
+    mt.model = PlayerModel.new(x, y)
+    mt.view = PlayerView.new()
     return mt
 end
 
@@ -60,8 +60,8 @@ end
 function PlayerController:createBullet(bulletInfo)
     if not bulletInfo then return end
     
-    -- 创建远程攻击子弹
-    local bullet = BulletModel:new(
+    -- 创建远程攻击子弹控制器
+    local bullet = BulletController.new(
         bulletInfo.startX,
         bulletInfo.startY,
         bulletInfo.targetX,
@@ -73,7 +73,7 @@ function PlayerController:createBullet(bulletInfo)
     
     -- 设置子弹特殊效果
     if bulletInfo.effects then
-        bullet.effects = bulletInfo.effects
+        bullet.model.effects = bulletInfo.effects
     end
     
     -- 添加子弹到玩家的子弹列表
@@ -103,16 +103,8 @@ function PlayerController:gainExp(exp)
     return self.model:gainExp(exp)
 end
 
-function PlayerController:equipRune(rune)
-    return self.model:equipRune(rune)
-end
-
-function PlayerController:unequipRune(slot)
-    return self.model:unequipRune(slot)
-end
-
 function PlayerController:getPosition()
-    return {x = self.model.x, y = self.model.y}
+    return self.model:getPosition()
 end
 
 function PlayerController:getModel()

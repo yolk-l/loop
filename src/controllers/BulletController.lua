@@ -5,10 +5,10 @@ BulletController.__index = BulletController
 local BulletModel = require('src/models/BulletModel')
 local BulletView = require('src/views/BulletView')
 
-function BulletController:new(startX, startY, targetX, targetY, speed, damage, sourceType)
+function BulletController.new(startX, startY, targetX, targetY, speed, damage, sourceType)
     local mt = setmetatable({}, BulletController)
-    mt.model = BulletModel:new(startX, startY, targetX, targetY, speed, damage, sourceType)
-    mt.view = BulletView:new()
+    mt.model = BulletModel.new(startX, startY, targetX, targetY, speed, damage, sourceType)
+    mt.view = BulletView.new()
     mt.hitEffects = {}  -- 存储击中效果
     return mt
 end

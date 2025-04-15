@@ -2,7 +2,7 @@
 local InventoryModel = {}
 InventoryModel.__index = InventoryModel
 
-function InventoryModel:new(capacity)
+function InventoryModel.new(capacity)
     local self = setmetatable({}, InventoryModel)
     self.items = {}       -- 物品列表
     self.capacity = capacity or 30  -- 默认容量，从20增加到30

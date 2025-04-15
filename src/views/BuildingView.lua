@@ -58,7 +58,7 @@ local function loadBuildingImage(type)
     return buildingImages[type]
 end
 
-function BuildingView:new()
+function BuildingView.new()
     local self = setmetatable({}, BuildingView)
     initFont()
     return self
@@ -124,7 +124,7 @@ function BuildingView:draw(buildingModel)
     -- 绘制剩余时间条
     local timeBarWidth = buildingModel.size * 2
     local timeBarHeight = 4
-    local timePercentage = attributes.remainingTime / attributes.lifespan
+    local timePercentage = buildingModel.remainingTime / attributes.lifespan
     
     love.graphics.setColor(0.2, 0.2, 0.2)
     love.graphics.rectangle('fill', x - timeBarWidth/2, y + sprite:getHeight()/2 * buildingModel.scale + 10, timeBarWidth, timeBarHeight)
@@ -133,7 +133,7 @@ function BuildingView:draw(buildingModel)
     love.graphics.rectangle('fill', x - timeBarWidth/2, y + sprite:getHeight()/2 * buildingModel.scale + 10, timeBarWidth * timePercentage, timeBarHeight)
     
     -- 如果建筑即将消失，添加闪烁效果
-    if attributes.remainingTime < 10 and math.floor(status.animTime * 4) % 2 == 0 then
+    if buildingModel.remainingTime < 10 and math.floor(status.animTime * 4) % 2 == 0 then
         love.graphics.setColor(1, 0.3, 0.3, 0.3)
         love.graphics.draw(
             sprite, 

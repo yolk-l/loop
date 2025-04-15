@@ -6,14 +6,14 @@ InventoryController.__index = InventoryController
 local InventoryModel = require('src/models/InventoryModel')
 local InventoryView = require('src/views/InventoryView')
 
-function InventoryController:new()
-    local self = setmetatable({}, InventoryController)
-    self.model = InventoryModel:new(10)  -- 创建10格的背包
-    self.view = InventoryView:new()
-    self.x = 0
-    self.y = 0
-    self.items = {}  -- 初始化物品列表
-    return self
+function InventoryController.new()
+    local mt = setmetatable({}, InventoryController)
+    mt.model = InventoryModel.new(10)  -- 创建10格的背包
+    mt.view = InventoryView.new()
+    mt.x = 0
+    mt.y = 0
+    mt.items = {}  -- 初始化物品列表
+    return mt
 end
 
 function InventoryController:addItem(item)

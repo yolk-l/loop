@@ -1,34 +1,16 @@
 -- 怪物配置文件
-
-local MONSTER_TYPES = {
-    SLIME = 1,
-    GOBLIN = 2,
-    SKELETON = 3,
-    ZOMBIE = 4,
-    WOLF = 5,
-    GHOST = 6,
-    GOLEM = 7,
-    WITCH = 8,
-    DRAGON = 9,
-}
-
--- 怪物等级分类
-local MONSTER_TIERS = {
-    BASIC = 1,
-    ADVANCED = 2,
-    ELITE = 3
-}
+local TypeDefines = require('config/type_defines')
 
 -- 怪物配置
 local MONSTER_CONFIG = {
     -- 基础怪物
-    slime = {
+    [TypeDefines.MONSTER_TYPES.SLIME] = {
         name = "史莱姆",
         color = {0.2, 0.8, 0.2},
         size = 12,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,       -- 近战怪物不需要子弹速度
-        tier = MONSTER_TIERS.BASIC,
+        tier = TypeDefines.MONSTER_TIERS.BASIC,
         attributes = {
             maxHp = 30,
             hp = 30,
@@ -46,13 +28,13 @@ local MONSTER_CONFIG = {
         dropRate = 0.3,
         expValue = 10
     },
-    goblin = {
+    [TypeDefines.MONSTER_TYPES.GOBLIN] = {
         name = "哥布林",
         color = {0.8, 0.4, 0.0},
         size = 14,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
-        tier = MONSTER_TIERS.BASIC,
+        tier = TypeDefines.MONSTER_TIERS.BASIC,
         attributes = {
             maxHp = 40,
             hp = 40,
@@ -70,13 +52,13 @@ local MONSTER_CONFIG = {
         dropRate = 0.4,
         expValue = 15
     },
-    skeleton = {
+    [TypeDefines.MONSTER_TYPES.SKELETON] = {
         name = "骷髅",
         color = {0.7, 0.7, 0.7},
         size = 16,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 200,      -- 子弹速度
-        tier = MONSTER_TIERS.BASIC,
+        tier = TypeDefines.MONSTER_TIERS.BASIC,
         attributes = {
             maxHp = 50,
             hp = 50,
@@ -96,13 +78,13 @@ local MONSTER_CONFIG = {
     },
     
     -- 新增高级怪物
-    zombie = {
+    [TypeDefines.MONSTER_TYPES.ZOMBIE] = {
         name = "僵尸",
         color = {0.3, 0.6, 0.3},
         size = 18,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
-        tier = MONSTER_TIERS.ADVANCED,
+        tier = TypeDefines.MONSTER_TIERS.ADVANCED,
         attributes = {
             maxHp = 80,
             hp = 80,
@@ -121,13 +103,13 @@ local MONSTER_CONFIG = {
         expValue = 30
     },
     
-    wolf = {
+    [TypeDefines.MONSTER_TYPES.WOLF] = {
         name = "狼人",
         color = {0.5, 0.2, 0.0},
         size = 20,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
-        tier = MONSTER_TIERS.ADVANCED,
+        tier = TypeDefines.MONSTER_TIERS.ADVANCED,
         attributes = {
             maxHp = 100,
             hp = 100,
@@ -146,13 +128,13 @@ local MONSTER_CONFIG = {
         expValue = 40
     },
     
-    ghost = {
+    [TypeDefines.MONSTER_TYPES.GHOST] = {
         name = "幽灵",
         color = {0.7, 0.7, 0.9},
         size = 16,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 200,      -- 子弹速度
-        tier = MONSTER_TIERS.ADVANCED,
+        tier = TypeDefines.MONSTER_TIERS.ADVANCED,
         attributes = {
             maxHp = 70,
             hp = 70,
@@ -172,13 +154,13 @@ local MONSTER_CONFIG = {
     },
     
     -- 精英怪物
-    golem = {
+    [TypeDefines.MONSTER_TYPES.GOLEM] = {
         name = "石巨人",
         color = {0.4, 0.4, 0.4},
         size = 24,
         attackType = "melee",  -- 近战攻击
         bulletSpeed = 0,
-        tier = MONSTER_TIERS.ELITE,
+        tier = TypeDefines.MONSTER_TIERS.ELITE,
         attributes = {
             maxHp = 150,
             hp = 150,
@@ -197,13 +179,13 @@ local MONSTER_CONFIG = {
         expValue = 50
     },
     
-    witch = {
+    [TypeDefines.MONSTER_TYPES.WITCH] = {
         name = "女巫",
         color = {0.8, 0.2, 0.8},
         size = 18,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 250,      -- 子弹速度
-        tier = MONSTER_TIERS.ELITE,
+        tier = TypeDefines.MONSTER_TIERS.ELITE,
         attributes = {
             maxHp = 90,
             hp = 90,
@@ -222,13 +204,13 @@ local MONSTER_CONFIG = {
         expValue = 45
     },
     
-    dragon = {
+    [TypeDefines.MONSTER_TYPES.DRAGON] = {
         name = "小龙",
         color = {0.8, 0.2, 0.2},
         size = 22,
         attackType = "ranged",  -- 远程攻击
         bulletSpeed = 300,      -- 子弹速度
-        tier = MONSTER_TIERS.ELITE,
+        tier = TypeDefines.MONSTER_TIERS.ELITE,
         attributes = {
             maxHp = 120,
             hp = 120,
@@ -248,7 +230,4 @@ local MONSTER_CONFIG = {
     }
 }
 
-return {
-    MONSTER_CONFIG = MONSTER_CONFIG,
-    MONSTER_TYPES = MONSTER_TYPES
-}
+return MONSTER_CONFIG

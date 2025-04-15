@@ -1,4 +1,6 @@
 -- 怪物模型
+local Global = require('src/utils/Global')
+
 local MonsterModel = {}
 MonsterModel.__index = MonsterModel
 
@@ -6,76 +8,121 @@ MonsterModel.__index = MonsterModel
 local MonsterConfig = require('config/monsters')
 local TerrainConfig = require('config/terrain')
 
--- 全局ID计数器
-local nextMonsterId = 1
-
-function MonsterModel:new(type, x, y)
-    local mt = setmetatable({}, MonsterModel)
-    
-    -- 设置唯一ID
-    mt.id = nextMonsterId
-    nextMonsterId = nextMonsterId + 1
-    
-    mt.type = type
-    mt.x = x
-    mt.y = y
-    
-    -- 获取怪物配置
-    mt.config = MonsterConfig.MONSTER_CONFIG[type] or MonsterConfig.MONSTER_CONFIG.slime
-    
-    -- 怪物属性
-    mt.attributes = {
-        maxHp = mt.config.hp or 100,
-        hp = mt.config.hp or 100,
-        attack = mt.config.attack or 10,
-        defense = mt.config.defense or 5,
-        speed = mt.config.speed or 40,
-        attackRange = mt.config.attackRange or 50,
-        detectRange = mt.config.detectRange or 200,
-        attackCooldown = mt.config.attackCooldown or 1.5,
-        lastAttackTime = 0
-    }
-    
-    -- 怪物状态
-    mt.status = {
-        isDead = false,
-        isMoving = false,
-        isAttacking = false,
-        attackStartTime = 0,
-        direction = "right",
-        stunned = false,
-        stunnedTime = 0
-    }
-    
-    -- 目标
-    mt.target = nil
-    
-    -- 子弹数组
-    mt.bullets = {}
-    
-    -- 怪物大小
-    mt.size = mt.config.size or 15
-    
-    -- 路径和AI相关
-    mt.ai = {
-        path = {},
-        pathIndex = 1,
-        wanderTimer = 0,
-        wanderX = nil,
-        wanderY = nil,
-        state = "idle", -- idle, chase, attack, wander
-        lastSeenTarget = nil,
-        lastSeenTime = 0
-    }
-    
-    -- 其他属性
-    mt.loot = mt.config.loot or {}
-    mt.expValue = mt.config.expValue or 10
-    
-    -- 所属建筑引用
-    mt.homeBuilding = nil
-
+function MonsterModel.new(type, x, y)
+    local monsterConfig = MonsterConfig[type]
+    local mt = setmetatable({
+        id = Global.gen_id(),
+        type = type,
+        x = x,
+        y = y,
+        config = monsterConfig,
+        attributes = {
+            maxHp = monsterConfig.hp or 100,
+            hp = monsterConfig.hp or 100,
+            attack = monsterConfig.attack or 10,
+            defense = monsterConfig.defense or 5,
+            speed = monsterConfig.speed or 40,
+            attackRange = monsterConfig.attackRange or 50,
+            detectRange = monsterConfig.detectRange or 200,
+            attackCooldown = monsterConfig.attackCooldown or 1.5,
+            lastAttackTime = 0
+        },
+        status = {
+            isDead = false,
+            isMoving = false,
+            isAttacking = false,
+            attackStartTime = 0,
+            direction = "right",
+            stunned = false,
+            stunnedTime = 0
+        },
+        target = nil,
+        bullets = {},
+        size = monsterConfig.size or 15,
+        ai = {
+            path = {},
+            pathIndex = 1,
+            wanderTimer = 0,
+            wanderX = nil,
+            wanderY = nil,
+            state = "idle",
+            lastSeenTarget = nil,
+            lastSeenTime = 0
+        },
+        loot = monsterConfig.loot or {},
+        expValue = monsterConfig.expValue or 10,
+        homeBuilding = nil
+    }, MonsterModel)
     return mt
+end
+
+-- Getter 方法
+function MonsterModel:getPosition()
+    return {x = self.x, y = self.y}
+end
+
+function MonsterModel:getType()
+    return self.type
+end
+
+function MonsterModel:getTier()
+    return self.config.tier
+end
+
+function MonsterModel:getConfig()
+    return self.config
+end
+
+function MonsterModel:getAttributes()
+    return self.attributes
+end
+
+function MonsterModel:getStatus()
+    return self.status
+end
+
+function MonsterModel:getSize()
+    return self.size
+end
+
+function MonsterModel:getBullets()
+    return self.bullets
+end
+
+function MonsterModel:getAI()
+    return self.ai
+end
+
+function MonsterModel:getDebugMode()
+    return self.debug or false
+end
+
+function MonsterModel:isDead()
+    return self.status.isDead
+end
+
+function MonsterModel:isAttacking()
+    return self.status.isAttacking
+end
+
+function MonsterModel:isMoving()
+    return self.status.isMoving
+end
+
+function MonsterModel:getDirection()
+    return self.status.direction
+end
+
+function MonsterModel:getHomeBuilding()
+    return self.homeBuilding
+end
+
+function MonsterModel:getExpValue()
+    return self.expValue
+end
+
+function MonsterModel:getLoot()
+    return self.loot
 end
 
 function MonsterModel:update(dt, map)
@@ -101,7 +148,8 @@ function MonsterModel:update(dt, map)
         end
     end
     
-    -- 更新攻击状态
+    -- 更新攻击状态 - 这里不再进行设置，让AI中统一管理
+    -- 只保留超时检测，确保攻击动画不会无限播放
     if self.status.isAttacking then
         local currentTime = love.timer.getTime()
         if currentTime - self.status.attackStartTime > 0.3 then
@@ -189,6 +237,10 @@ function MonsterModel:updateAI(dt, map)
     -- 在攻击范围内则攻击
     if distance <= self.attributes.attackRange then
         self.ai.state = "attack"
+        -- 确保设置攻击状态标记用于动画
+        self.status.isAttacking = true
+        self.status.attackStartTime = love.timer.getTime()
+        
         local attackResult = self:attack(self.target)
         
         -- 如果在理想攻击距离之内，停止接近玩家
@@ -202,6 +254,9 @@ function MonsterModel:updateAI(dt, map)
             return attackResult
         end
         -- 否则，继续追逐
+    else
+        -- 不在攻击范围内时，确保攻击状态被重置
+        self.status.isAttacking = false
     end
     
     -- 追逐目标
@@ -377,8 +432,15 @@ function MonsterModel:wander(dt, map)
 end
 
 function MonsterModel:attack(target)
-    -- 如果在冷却中，不能攻击
+    -- 检查是否正在攻击冷却
     if self.attributes.lastAttackTime > 0 then
+        -- 仍在冷却中，但保持攻击姿态动画一段时间
+        local currentTime = love.timer.getTime()
+        if currentTime - self.attributes.lastAttackTime < 0.2 then  -- 保持攻击动画短暂时间
+            self.status.isAttacking = true
+        else
+            self.status.isAttacking = false
+        end
         return false
     end
     
@@ -397,6 +459,7 @@ function MonsterModel:attack(target)
     local distance = math.sqrt(dx * dx + dy * dy)
     
     if distance > self.attributes.attackRange then
+        self.status.isAttacking = false
         return false  -- 目标超出攻击范围
     end
     
@@ -455,10 +518,6 @@ end
 function MonsterModel:heal(amount)
     -- 回复生命值，不超过最大值
     self.attributes.hp = math.min(self.attributes.maxHp, self.attributes.hp + amount)
-end
-
-function MonsterModel:getHomeBuilding()
-    return self.homeBuilding
 end
 
 function MonsterModel:setHomeBuilding(building)

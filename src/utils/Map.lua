@@ -68,33 +68,6 @@ function Map:perlinNoise(x, y, seed, octaves)
     return noise / totalAmplitude
 end
 
-function Map:new()
-    local self = setmetatable({}, Map)
-    self.tileSize = 20  -- 每个格子的大小
-    self.gridWidth = 40  -- 地图宽度 40*20=800 像素
-    self.gridHeight = 30 -- 地图高度，留出底部空间给手牌
-    
-    -- 初始化随机数生成器
-    math.randomseed(os.time())
-    
-    -- 初始化地图数据和装饰物数据
-    self.tiles = {}
-    self.decorations = {}
-    
-    -- 高分辨率地形数据，用于平滑过渡
-    self.highResMap = {}
-    self.highResScale = 4  -- 每个格子内部的高分辨率点数
-    
-    -- 存储装饰物的预计算数据
-    self.decorationData = {}
-    
-    self:generateMap()
-    self:generateHighResMap()
-    self:generateDecorations()
-    
-    return self
-end
-
 function Map:generateMap()
     -- 生成不同的种子用于不同的地形层
     local waterSeed = math.random(1, 1000)

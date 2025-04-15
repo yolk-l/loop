@@ -5,9 +5,9 @@ MapView.__index = MapView
 -- 引入地形配置
 local TerrainConfig = require('config/terrain')
 
-function MapView:new()
-    local self = setmetatable({}, MapView)
-    return self
+function MapView.new()
+    local mt = setmetatable({}, MapView)
+    return mt
 end
 
 function MapView:draw(mapModel)

@@ -7,48 +7,31 @@ local BuildingConfig = require('config/buildings')
 local MonsterModel = require('src/models/MonsterModel')
 -- 初始化配置
 
-function BuildingModel:new(type, x, y)
-    local self = setmetatable({}, BuildingModel)
-    self.type = type
-    self.x = x
-    self.y = y
-    
-    -- 从配置文件获取建筑类型配置
-    local config = BuildingConfig.get(type)
-    
-    -- 设置基本属性
-    self.name = config.name
-    self.color = config.color
-    self.monsterType = config.monsterType
-    self.spriteColor = config.spriteColor
-    
-    -- 初始化建筑属性
-    self.attributes = {
-        hp = config.attributes.hp,
-        maxHp = config.attributes.maxHp,
-        lifespan = config.attributes.lifespan,
+function BuildingModel.new(type, x, y)
+    local config = BuildingConfig[type]
+    local mt = setmetatable({
+        type = type,
+        x = x,
+        y = y,
+        name = config.name,
+        color = config.color,
+        monsterType = config.monsterType,
+        spriteColor = config.spriteColor,
+        attributes = config.attributes,
+        imgWidth = 32,
+        imgHeight = 32,
+        scale = 1,
+        size = 16,
+        status = {
+            timeToNextSpawn = config.attributes.spawnRate,
+            spawnedMonsters = {},
+            isDead = false,
+            animTime = 0
+        },
         remainingTime = config.attributes.lifespan,
-        spawnRate = config.attributes.spawnRate,
-        spawnRadius = config.attributes.spawnRadius,
-        maxSpawns = config.attributes.maxSpawns,
-        wanderRadius = config.attributes.wanderRadius
-    }
-    
-    -- 获取图片相关信息
-    self.imgWidth = 32  -- 默认值，可以在视图层更新
-    self.imgHeight = 32 -- 默认值，可以在视图层更新
-    self.scale = 1      -- 默认缩放比例
-    self.size = 16      -- 默认碰撞尺寸
-    
-    -- 状态系统
-    self.status = {
-        timeToNextSpawn = self.attributes.spawnRate, -- 下次生成怪物的时间
-        spawnedMonsters = {},                        -- 已生成的怪物模型ID列表
-        isDead = false,                              -- 是否已经消失
-        animTime = 0                                 -- 用于动画效果时间计算
-    }
-    
-    return self
+    }, BuildingModel)
+
+    return mt
 end
 
 function BuildingModel:update(dt)
@@ -56,10 +39,10 @@ function BuildingModel:update(dt)
     self.status.animTime = self.status.animTime + dt
     
     -- 更新剩余时间
-    self.attributes.remainingTime = self.attributes.remainingTime - dt
+    self.remainingTime = self.remainingTime - dt
     
     -- 建筑存在时间到，标记为死亡
-    if self.attributes.remainingTime <= 0 then
+    if self.remainingTime <= 0 then
         self.status.isDead = true
         return
     end

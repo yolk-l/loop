@@ -5,30 +5,20 @@ MapModel.__index = MapModel
 -- 引入地形配置
 local TerrainConfig = require('config/terrain')
 
-function MapModel:new()
-    local self = setmetatable({}, MapModel)
+function MapModel.new()
     
-    -- 地图尺寸设置
-    self.tileSize = 20         -- 每个格子的大小
-    self.gridWidth = 40        -- 地图宽度，40*20=800像素
-    self.gridHeight = 30       -- 地图高度，留出底部空间给手牌
-    
-    -- 初始化随机数生成器
     math.randomseed(os.time())
-    
-    -- 初始化地图数据和装饰物数据
-    self.tiles = {}            -- 地形数据
-    self.decorations = {}      -- 装饰物标记
-    self.decorationData = {}   -- 装饰物详细数据
-    
-    -- 高分辨率地形数据，用于平滑过渡
-    self.highResMap = {}
-    self.highResScale = 4      -- 每个格子内部的高分辨率点数
-    
-    -- 存储装饰物的预计算数据
-    self.decorationData = {}
-    
-    return self
+    local mt = setmetatable({
+        tileSize = 20,
+        gridWidth = 40,
+        gridHeight = 30,
+        highResScale = 4,
+        tiles = {},
+        decorations = {},
+        decorationData = {},
+        highResMap = {},
+    }, MapModel)
+    return mt
 end
 
 -- 简单的噪声函数
