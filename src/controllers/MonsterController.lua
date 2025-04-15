@@ -18,6 +18,9 @@ function MonsterController:update(dt, map)
     -- 只更新模型状态，不再处理攻击结果
     self.model:update(dt, map)
     
+    -- 更新动画状态
+    self.view:update(dt, self.model)
+    
     -- 攻击结果处理已移至CombatManager
 end
 

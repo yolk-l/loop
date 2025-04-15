@@ -18,8 +18,24 @@ end
 
 function MonsterView.new()
     initFont()
-    local mt = setmetatable({}, MonsterView)
+    local mt = setmetatable({
+        animations = {}, -- 存储各个怪物的当前动画
+        animationStates = {}, -- 存储各个怪物的当前动画状态
+    }, MonsterView)
     return mt
+end
+
+-- 添加更新方法，用于更新怪物的动画状态
+function MonsterView:update(dt, monsterModel)
+    -- 如果怪物已死亡，不更新
+    if monsterModel:isDead() then
+        return
+    end
+    
+    local monsterId = monsterModel.id
+    if self.animations[monsterId] then
+        self.animations[monsterId]:update(dt)
+    end
 end
 
 function MonsterView:draw(monsterModel)
@@ -47,8 +63,18 @@ function MonsterView:draw(monsterModel)
         animationState = "idle"
     end
     
-    -- 使用正确的获取怪物动画的方法
-    local animation = AnimationSystem.getMonsterAnimation(monsterType, animationState)
+    -- 获取怪物ID
+    local monsterId = monsterModel.id
+    
+    -- 检查是否需要更新动画（状态变化或首次加载）
+    if not self.animations[monsterId] or self.animationStates[monsterId] ~= animationState then
+        -- 使用正确的获取怪物动画的方法
+        self.animations[monsterId] = AnimationSystem.getMonsterAnimation(monsterType, animationState)
+        self.animationStates[monsterId] = animationState
+    end
+    
+    -- 获取当前动画
+    local animation = self.animations[monsterId]
     
     -- 设置朝向
     local scaleX = 1
@@ -60,11 +86,26 @@ function MonsterView:draw(monsterModel)
     if animation then
         -- 使用动画
         love.graphics.setColor(1, 1, 1)
+        
+        -- 获取精灵图
+        local spriteImage = resources.images[monsterType] or resources.images.monster
+        
+        -- 获取精灵图的实际尺寸(每个精灵帧的尺寸是16x16)
+        local frameWidth = 16  -- 精灵图帧宽度
+        local frameHeight = 16  -- 精灵图帧高度
+        
+        -- 计算缩放比例以适应怪物size
+        local scale = config.size / 12  -- 基础大小为12
+        
+        -- 计算锚点，X轴居中，Y轴在底部
+        local offsetX = frameWidth / 2
+        local offsetY = frameHeight - 1  -- 稍微往上偏移1像素，使阴影位于脚下
+        
         animation:draw(
-            resources.images[monsterType] or resources.images.monster, 
+            spriteImage, 
             position.x, position.y, 
-            0, scaleX, 1, 
-            config.size / 2, config.size / 2
+            0, scaleX * scale, scale, 
+            offsetX, offsetY
         )
     else
         -- 没有动画时使用简单图形
