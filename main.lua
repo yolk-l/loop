@@ -1,25 +1,29 @@
 -- 主入口文件
 local PlayerController = require('src/controllers/PlayerController')
 local MapController = require('src/controllers/MapController')
-local MonsterController = require('src/controllers/MonsterController')
+local MonsterManager = require('src.managers.MonsterManager')  -- 引入怪物管理器
 local BuildingController = require('src/controllers/BuildingController')
+local BuildingManager = require('src.managers.BuildingManager')  -- 引入建筑管理器
 local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
 local Timer = require('lib/timer')  -- 引入timer库
-local CombatManager = require('src/controllers/CombatManager')
+local CombatManager = require('src.managers.CombatManager')
 local TypeDefines = require('config/type_defines')
 
 -- 游戏状态
 local player
 local mapController
 local gameFont
+local gameOverFont -- 游戏结束字体
+local gameOverStatsFont -- 游戏结束统计信息字体
+local gameOverRestartFont -- 游戏结束重新开始提示字体
 local gameTimer  -- 全局计时器实例
 local attackEffects = {}  -- 攻击效果数组
-local gameOver = false
-local gameOverTime = 0
 local buildingPreviewX, buildingPreviewY
 local buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
+local monsterManager  -- 怪物管理器实例
+local buildingManager  -- 建筑管理器实例
 
 function love.load()
     
@@ -30,6 +34,11 @@ function love.load()
     -- 使用中文字体
     gameFont = love.graphics.newFont("assets/fonts/simsun.ttc", 14)
     love.graphics.setFont(gameFont)
+    
+    -- 预加载游戏结束界面字体
+    gameOverFont = love.graphics.newFont("assets/fonts/simsun.ttc", 36)
+    gameOverStatsFont = love.graphics.newFont("assets/fonts/simsun.ttc", 20)
+    gameOverRestartFont = love.graphics.newFont("assets/fonts/simsun.ttc", 16)
     
     -- 设置窗口大小
     love.window.setMode(800, 700)
@@ -43,6 +52,12 @@ function love.load()
     -- 初始化玩家控制器
     player = PlayerController.new(0, 0)  -- 初始位置不重要，会在setMap中重新定位到地图中央
     player:setMap(mapController.model)
+    
+    -- 初始化怪物管理器
+    monsterManager = MonsterManager.new()
+    
+    -- 初始化建筑管理器
+    buildingManager = BuildingManager.new()
     
     -- 初始化卡牌控制器
     cardController = CardController.new()
@@ -63,6 +78,12 @@ function love.load()
         local idx = math.random(1, 3)  -- 改为1-9，包含所有9种建筑卡牌
         cardController:addCard(initCardTypes[idx])
     end
+    
+    -- 将monsterManager设置到BuildingController中
+    BuildingController.monsterManager = monsterManager
+    
+    -- 重置游戏状态
+    CombatManager:resetGameState()
 end
 
 function love.update(dt)
@@ -75,64 +96,31 @@ function love.update(dt)
     end
     
     -- 更新玩家控制器
-    player:update(dt, MonsterController.getInstances())
+    player:update(dt, monsterManager:getInstances())
     
     -- 更新游戏逻辑
     player:update(dt)
     
     -- 玩家自动攻击范围内的怪物
-    player:autoAttack(MonsterController.getInstances())
+    player:autoAttack(monsterManager:getInstances())
     
     -- 更新所有建筑
-    BuildingController.updateAll(dt, player)
+    buildingManager:updateAll(dt, player)
     
     -- 让所有怪物将玩家设为目标
-    for _, monster in ipairs(MonsterController.instances) do
-        monster:setTarget(player)
-        
-        -- 确保怪物有活动的追踪状态
-        if monster.model.ai.state ~= "attack" then
-            -- 获取与玩家的距离
-            local pos = player:getPosition()
-            local dx = pos.x - monster.model.x
-            local dy = pos.y - monster.model.y
-            local distance = math.sqrt(dx*dx + dy*dy)
-            
-            -- 计算理想攻击距离
-            local idealDistance = monster.model.attributes.attackRange * 0.8
-            
-            -- 如果距离在合理范围内，进入追踪状态
-            if distance <= monster.model.attributes.detectRange * 1.5 then
-                monster.model.ai.state = "chase"
-                
-                -- 如果超出理想攻击距离，则移动
-                if distance > idealDistance then
-                    monster.model.status.isMoving = true
-                else
-                    -- 否则在理想距离内停止移动
-                    monster.model.status.isMoving = false
-                end
-                
-                monster.model.ai.lastSeenTarget = {x = pos.x, y = pos.y}
-                monster.model.ai.lastSeenTime = love.timer.getTime()
-            end
-        end
-    end
+    monsterManager:setTargetForAll(player)
     
     -- 更新所有怪物
-    MonsterController.updateAll(dt, mapController.model)
+    monsterManager:updateAll(dt, mapController.model)
     
     -- 处理怪物攻击逻辑 (新增)
-    CombatManager:handleMonsterAttacks(MonsterController, player)
+    CombatManager:handleMonsterAttacks(monsterManager, player)
     
     -- 处理怪物死亡和移除
-    CombatManager:processDeadMonsters(MonsterController, player, inventoryController, cardController)
-    
-    -- 更新所有子弹
-    MonsterController.updateBullets(dt)
+    CombatManager:processDeadMonsters(monsterManager, player, inventoryController, cardController)
     
     -- 处理子弹碰撞
-    CombatManager:handleBulletCollisions(player, MonsterController)
+    CombatManager:handleBulletCollisions(player, monsterManager)
     
     -- 更新物品
     inventoryController:updateItems(player)
@@ -143,19 +131,16 @@ function love.draw()
     mapController:draw()
     
     -- 绘制所有建筑
-    BuildingController.drawAll()
+    buildingManager:drawAll()
     
     -- 绘制所有掉落物
     inventoryController:drawItems()
     
-    -- 绘制所有怪物
-    MonsterController.drawAll()
+    -- 绘制所有怪物和子弹
+    monsterManager:drawAll()
     
     -- 绘制玩家
     player:draw()
-    
-    -- 绘制所有子弹
-    MonsterController.drawBullets()
     
     -- 绘制攻击特效
     for _, effect in ipairs(attackEffects) do
@@ -180,33 +165,31 @@ function love.draw()
     end
     
     -- 游戏结束界面
-    if gameOver then
+    if CombatManager:isGameOver() then
         -- 半透明黑色背景
         love.graphics.setColor(0, 0, 0, 0.7)
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
         
         -- 游戏结束文字
         love.graphics.setColor(1, 0.3, 0.3)
-        local font = love.graphics.newFont("assets/fonts/simsun.ttc", 36)
-        love.graphics.setFont(font)
+        love.graphics.setFont(gameOverFont)
         local text = "游戏结束"
-        local textWidth = font:getWidth(text)
+        local textWidth = gameOverFont:getWidth(text)
         love.graphics.print(text, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 - 50)
         
         -- 统计信息
         love.graphics.setColor(1, 1, 1)
-        font = love.graphics.newFont("assets/fonts/simsun.ttc", 20)
-        love.graphics.setFont(font)
+        love.graphics.setFont(gameOverStatsFont)
+        local playerModel = player:getModel()
         local statsText = string.format("等级: %d", playerModel.attributes.level)
-        textWidth = font:getWidth(statsText)
+        textWidth = gameOverStatsFont:getWidth(statsText)
         love.graphics.print(statsText, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 + 10)
         
         -- 重新开始提示
         love.graphics.setColor(0.8, 0.8, 0.8)
-        font = love.graphics.newFont("assets/fonts/simsun.ttc", 16)
-        love.graphics.setFont(font)
+        love.graphics.setFont(gameOverRestartFont)
         local restartText = "按 R 键重新开始"
-        textWidth = font:getWidth(restartText)
+        textWidth = gameOverRestartFont:getWidth(restartText)
         love.graphics.print(restartText, love.graphics.getWidth()/2 - textWidth/2, love.graphics.getHeight()/2 + 60)
         
         -- 恢复默认字体
@@ -228,8 +211,8 @@ function drawUI()
     love.graphics.print(string.format("防御: %d", playerModel.attributes.defense), 10, statsY + 60)
     
     -- 绘制建筑和怪物数量
-    love.graphics.print(string.format("建筑: %d", #BuildingController.instances), 10, statsY + 80)
-    love.graphics.print(string.format("怪物: %d", #MonsterController.instances), 10, statsY + 100)
+    love.graphics.print(string.format("建筑: %d", buildingManager:getCount()), 10, statsY + 80)
+    love.graphics.print(string.format("怪物: %d", #monsterManager:getInstances()), 10, statsY + 100)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
@@ -295,9 +278,9 @@ function love.mousepressed(x, y, button)
                         print("建筑类型: " .. (buildingType or "nil"))
                         
                         if buildingType then
-                            -- 使用BuildingController创建建筑
-                            BuildingController.createBuilding(buildingType, tileX, tileY)
-                            print("成功创建建筑，当前建筑数量: " .. #BuildingController.instances)
+                            -- 使用BuildingManager创建建筑
+                            buildingManager:createBuilding(buildingType, tileX, tileY)
+                            print("成功创建建筑，当前建筑数量: " .. buildingManager:getCount())
                             
                             -- 使用卡牌
                             cardController:removeCard(selectedCard)
@@ -310,7 +293,7 @@ function love.mousepressed(x, y, button)
         end
     elseif button == 2 then  -- 右键点击
         -- 检查是否点击了怪物（尝试攻击）
-        for _, monster in ipairs(MonsterController.instances) do
+        for _, monster in ipairs(monsterManager:getInstances()) do
             if not monster:isDead() then
                 local monsterPos = monster:getPosition()
                 local monsterModel = monster:getModel()
@@ -326,7 +309,8 @@ function love.mousepressed(x, y, button)
         end
         
         -- 检查是否点击了建筑（尝试攻击或拆除）
-        for _, building in ipairs(BuildingController.instances) do
+        local buildings = buildingManager:getInstances()
+        for _, building in ipairs(buildings) do
             local bx, by = building:getPosition()
             local dx = x - bx
             local dy = y - by
@@ -350,12 +334,12 @@ function love.keypressed(key)
         characterUI:toggleVisibility()
     elseif key == 'r' then
         -- 如果游戏结束，按R键重新开始
-        if gameOver then
+        if CombatManager:isGameOver() then
             -- 重新初始化游戏
-            gameOver = false
+            CombatManager:resetGameState()
             
             -- 清除所有建筑
-            BuildingController.clearAll()
+            buildingManager:clearAll()
             
             -- 重新初始化玩家
             player = PlayerController.new(0, 0)
@@ -376,7 +360,10 @@ function love.keypressed(key)
             mapController:regenerate()
             
             -- 清除所有怪物
-            MonsterController.clearAll()
+            monsterManager:clearAll()
+            
+            -- 将monsterManager重新设置到BuildingController
+            BuildingController.monsterManager = monsterManager
             
             return
         end

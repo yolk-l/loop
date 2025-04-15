@@ -14,6 +14,7 @@ function CardController.new()
     return mt
 end
 
+-- 直接代理到模型方法
 function CardController:addCard(cardType)
     return self.model:addCardToHand(cardType)
 end
@@ -30,6 +31,7 @@ function CardController:getSelectedBuildingType()
     return self.model:getSelectedBuildingType()
 end
 
+-- 处理鼠标点击的控制器逻辑
 function CardController:handleMouseClick(x, y)
     -- 检查是否点击在手牌区域
     if self.view:isHandAreaClicked(x, y) then
@@ -50,26 +52,25 @@ function CardController:handleMouseClick(x, y)
     return false
 end
 
+-- 渲染相关的控制器方法
 function CardController:draw()
     self.view:drawHand(self.model:getHand(), self.model:getSelectedIndex())
 end
 
--- 获取当前选中的卡牌索引
+-- 代理到模型方法以获取数据
 function CardController:getSelectedIndex()
     return self.model:getSelectedIndex()
 end
 
--- 获取手牌
 function CardController:getHand()
     return self.model:getHand()
 end
 
--- 获取视图对象
 function CardController:getView()
     return self.view
 end
 
--- 外部接口以访问 CARD_TYPES
+-- 提供类型常量的访问
 function CardController:getCardTypes()
     return TypeDefines.CARD_TYPES
 end

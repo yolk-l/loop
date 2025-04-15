@@ -5,6 +5,10 @@ CombatManager.__index = CombatManager
 local ItemSystem = require('src/utils/Item')
 local ItemConfig = require('config/items')
 
+-- 游戏状态变量
+CombatManager.gameOver = false
+CombatManager.gameOverTime = 0
+
 function CombatManager:handleMonsterDeath(monster, player, inventoryController, cardController)
     local monsterModel = monster:getModel()
     -- 生成掉落物
@@ -37,20 +41,32 @@ function CombatManager:handlePlayerDeath(player)
     local playerModel = player:getModel()
     if playerModel.attributes.hp <= 0 then
         -- 玩家已死亡，游戏结束
-        if not gameOver then
-            gameOver = true
-            gameOverTime = love.timer.getTime()
+        if not CombatManager.gameOver then
+            CombatManager.gameOver = true
+            CombatManager.gameOverTime = love.timer.getTime()
         end
         return true  -- 表示游戏结束
     end
     return false
 end
 
+-- 获取游戏是否结束
+function CombatManager:isGameOver()
+    return CombatManager.gameOver
+end
+
+-- 重置游戏状态
+function CombatManager:resetGameState()
+    CombatManager.gameOver = false
+    CombatManager.gameOverTime = 0
+end
+
 -- 集中处理怪物死亡和移除
-function CombatManager:processDeadMonsters(monsterController, player, inventoryController, cardController)
+function CombatManager:processDeadMonsters(monsterManager, player, inventoryController, cardController)
     -- 处理怪物死亡和掉落
-    for i = #monsterController.instances, 1, -1 do
-        local monster = monsterController.instances[i]
+    local monsters = monsterManager:getInstances()
+    for i = #monsters, 1, -1 do
+        local monster = monsters[i]
         
         -- 如果怪物已死亡但未被移除
         if monster:isDead() then
@@ -59,17 +75,18 @@ function CombatManager:processDeadMonsters(monsterController, player, inventoryC
     end
     
     -- 移除已死亡的怪物
-    monsterController.removeDeadMonsters()
+    monsterManager:removeDeadMonsters()
 end
 
-function CombatManager:handleBulletCollisions(player, monsterController)
+function CombatManager:handleBulletCollisions(player, monsterManager)
     local playerBullets = player:getBullets()
-    local monsterBullets = monsterController.getBullets()
+    local monsterBullets = monsterManager:getBullets()
+    local monsters = monsterManager:getInstances()
     
     -- 检查玩家子弹与怪物的碰撞
     for i = #playerBullets, 1, -1 do
         local bullet = playerBullets[i]
-        for _, monster in ipairs(monsterController.instances) do
+        for _, monster in ipairs(monsters) do
             if not monster:isDead() and bullet.checkCollision then
                 local monsterPos = monster:getPosition()
                 local monsterEntity = {
@@ -107,9 +124,10 @@ function CombatManager:handleBulletCollisions(player, monsterController)
 end
 
 -- 集中处理怪物攻击
-function CombatManager:handleMonsterAttacks(monsterController, player)
+function CombatManager:handleMonsterAttacks(monsterManager, player)
     -- 遍历所有怪物
-    for _, monster in ipairs(monsterController.instances) do
+    local monsters = monsterManager:getInstances()
+    for _, monster in ipairs(monsters) do
         -- 获取怪物模型
         local monsterModel = monster:getModel()
         
@@ -136,8 +154,9 @@ function CombatManager:handleMonsterAttacks(monsterController, player)
                 -- 处理攻击结果
                 if attackResult then
                     if attackResult.type == "ranged" then
-                        -- 创建子弹
-                        monster:createBullet(attackResult.bulletInfo)
+                        -- 创建子弹并添加到管理器
+                        local bullet = monster:createBullet(attackResult.bulletInfo)
+                        monsterManager:addBullet(bullet)
                     elseif attackResult.type == "melee" and attackResult.source and attackResult.source.target then
                         -- 处理近战攻击
                         local target = attackResult.source.target

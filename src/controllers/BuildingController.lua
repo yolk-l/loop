@@ -6,8 +6,8 @@ local BuildingModel = require('src/models/BuildingModel')
 local BuildingView = require('src/views/BuildingView')
 local MonsterController = require('src/controllers/MonsterController')
 
--- 静态变量，用于管理所有建筑实例
-BuildingController.instances = {}
+-- 静态引用，将在main.lua中设置
+BuildingController.monsterManager = nil
 
 function BuildingController.new(type, x, y)
     local mt = setmetatable({}, BuildingController)
@@ -16,9 +16,6 @@ function BuildingController.new(type, x, y)
     
     -- 加载并设置图像尺寸数据
     mt.view:loadImage(mt.model)
-    
-    -- 添加到实例列表
-    table.insert(BuildingController.instances, mt)
     
     return mt
 end
@@ -40,12 +37,22 @@ function BuildingController:spawnMonster(player)
     -- 获取生成位置
     local spawnX, spawnY = self.model:getSpawnPosition()
     
-    -- 创建新怪物实例
-    local monsterController = MonsterController.new(
-        self.model:getMonsterType(), 
-        spawnX, 
-        spawnY
-    )
+    -- 创建新怪物实例并添加到manager
+    local monsterController
+    if BuildingController.monsterManager then
+        monsterController = BuildingController.monsterManager:createMonster(
+            self.model:getMonsterType(), 
+            spawnX, 
+            spawnY
+        )
+    else
+        -- 后向兼容，如果没有monsterManager，则直接使用MonsterController
+        monsterController = MonsterController.new(
+            self.model:getMonsterType(), 
+            spawnX, 
+            spawnY
+        )
+    end
     
     -- 设置怪物归属建筑
     monsterController.model.homeBuilding = self.model
@@ -86,10 +93,19 @@ function BuildingController:spawnMonster(player)
 end
 
 function BuildingController:clearDeadMonsters()
-    -- 从MonsterController获取所有怪物模型
+    -- 从monsterManager或MonsterController获取所有怪物模型
     local monsterModels = {}
-    for _, monsterController in ipairs(MonsterController.instances) do
-        monsterModels[monsterController.model.id] = monsterController.model
+    
+    if BuildingController.monsterManager then
+        -- 使用monsterManager获取所有怪物实例
+        for _, monsterController in ipairs(BuildingController.monsterManager:getInstances()) do
+            monsterModels[monsterController.model.id] = monsterController.model
+        end
+    else
+        -- 后向兼容，直接从MonsterController获取
+        for _, monsterController in ipairs(MonsterController.instances) do
+            monsterModels[monsterController.model.id] = monsterController.model
+        end
     end
     
     -- 清理已死亡的怪物
@@ -116,39 +132,9 @@ function BuildingController:getModel()
     return self.model
 end
 
--- 静态方法：更新所有建筑实例
-function BuildingController.updateAll(dt, player)
-    for i = #BuildingController.instances, 1, -1 do
-        local instance = BuildingController.instances[i]
-        instance:update(dt, player)
-        
-        -- 移除已死亡的建筑
-        if instance:isDead() then
-            table.remove(BuildingController.instances, i)
-        end
-    end
-end
-
--- 静态方法：绘制所有建筑实例
-function BuildingController.drawAll()
-    for _, instance in ipairs(BuildingController.instances) do
-        instance:draw()
-    end
-end
-
--- 静态方法：获取所有建筑实例
-function BuildingController.getInstances()
-    return BuildingController.instances
-end
-
--- 静态方法：清除所有建筑
-function BuildingController.clearAll()
-    BuildingController.instances = {}
-end
-
--- 静态方法：创建建筑
-function BuildingController.createBuilding(type, x, y)
-    return BuildingController.new(type, x, y)
+-- 获取建筑类型
+function BuildingController:getType()
+    return self.model:getType()
 end
 
 return BuildingController 

@@ -3,7 +3,6 @@ local ItemModel = {}
 ItemModel.__index = ItemModel
 
 -- 引入配置
-local ItemConfig = require('config/items')
 local Global = require('src/utils/global')
 
 -- 创建新物品模型

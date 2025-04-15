@@ -18,7 +18,20 @@ function BulletView.new()
         loadBulletImage()
     end
     
+    -- 添加存储hit effects的数组
+    self.hitEffects = {}
+    
     return self
+end
+
+function BulletView:update(dt)
+    -- 更新击中效果
+    for i = #self.hitEffects, 1, -1 do
+        self.hitEffects[i].lifetime = self.hitEffects[i].lifetime - dt
+        if self.hitEffects[i].lifetime <= 0 then
+            table.remove(self.hitEffects, i)
+        end
+    end
 end
 
 function BulletView:draw(bulletModel)
@@ -58,6 +71,23 @@ function BulletView:draw(bulletModel)
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
+    
+    -- 绘制所有击中效果
+    for _, effect in ipairs(self.hitEffects) do
+        self:drawHitEffect(effect.x, effect.y, effect.isCritical)
+    end
+end
+
+-- 创建击中效果
+function BulletView:createHitEffect(x, y, isCritical)
+    local effect = {
+        x = x,
+        y = y,
+        isCritical = isCritical,
+        lifetime = 0.3  -- 效果持续时间，单位秒
+    }
+    
+    table.insert(self.hitEffects, effect)
 end
 
 -- 绘制子弹击中效果
