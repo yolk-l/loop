@@ -35,7 +35,7 @@ local MONSTER_CONFIG = {
             attack = 5,
             defense = 2,
             speed = 60,
-            attackRange = 25,  -- 近战攻击范围
+            attackRange = 40,  -- 近战攻击范围提高
             detectRange = 80
         },
         animations = {
@@ -59,7 +59,7 @@ local MONSTER_CONFIG = {
             attack = 8,
             defense = 3,
             speed = 80,
-            attackRange = 30,  -- 近战攻击范围
+            attackRange = 45,  -- 近战攻击范围提高
             detectRange = 100
         },
         animations = {
@@ -109,7 +109,7 @@ local MONSTER_CONFIG = {
             attack = 12,
             defense = 6,
             speed = 50,  -- 较慢
-            attackRange = 35,  -- 近战攻击范围
+            attackRange = 50,  -- 近战攻击范围提高
             detectRange = 90
         },
         animations = {
@@ -134,7 +134,7 @@ local MONSTER_CONFIG = {
             attack = 15,
             defense = 8,
             speed = 90,  -- 非常快
-            attackRange = 40,  -- 近战攻击范围
+            attackRange = 55,  -- 近战攻击范围提高
             detectRange = 150
         },
         animations = {
@@ -185,7 +185,7 @@ local MONSTER_CONFIG = {
             attack = 20,
             defense = 15,
             speed = 40,  -- 非常慢
-            attackRange = 30,  -- 近战攻击范围
+            attackRange = 60,  -- 近战攻击范围提高
             detectRange = 110
         },
         animations = {
@@ -248,4 +248,7 @@ local MONSTER_CONFIG = {
     }
 }
 
-return MONSTER_CONFIG 
+return {
+    MONSTER_CONFIG = MONSTER_CONFIG,
+    MONSTER_TYPES = MONSTER_TYPES
+}

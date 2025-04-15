@@ -3,7 +3,7 @@ local BuildingView = {}
 BuildingView.__index = BuildingView
 
 -- 引入动画系统
-local AnimationSystem = require('src/systems/Animation')
+local AnimationSystem = require('src/utils/Animation')
 
 -- 字体缓存
 local buildingFont = nil

@@ -23,20 +23,20 @@ function BuildingController:new(type, x, y)
     return self
 end
 
-function BuildingController:update(dt)
+function BuildingController:update(dt, player)
     -- 更新模型状态
     self.model:update(dt)
     
     -- 尝试生成怪物
     if self.model:canSpawnMonster() then
-        self:spawnMonster()
+        self:spawnMonster(player)
     end
     
     -- 清理已死亡的怪物
     self:clearDeadMonsters()
 end
 
-function BuildingController:spawnMonster()
+function BuildingController:spawnMonster(player)
     -- 获取生成位置
     local spawnX, spawnY = self.model:getSpawnPosition()
     
@@ -52,6 +52,35 @@ function BuildingController:spawnMonster()
     
     -- 将怪物ID添加到建筑的怪物列表
     self.model:addSpawnedMonster(monsterController.model.id)
+    
+    -- 如果提供了玩家，则将其设置为目标并立即激活追踪行为
+    if player then
+        monsterController:setTarget(player)
+        
+        -- 获取与玩家的距离
+        local pos = player:getPosition()
+        local dx = pos.x - monsterController.model.x
+        local dy = pos.y - monsterController.model.y
+        local distance = math.sqrt(dx*dx + dy*dy)
+        
+        -- 计算理想攻击距离
+        local idealDistance = monsterController.model.attributes.attackRange * 0.8
+        
+        -- 强制设置为追踪状态
+        monsterController.model.ai.state = "chase"
+        
+        -- 如果超出理想攻击距离，则移动
+        if distance > idealDistance then
+            monsterController.model.status.isMoving = true
+        else
+            -- 否则在理想距离内停止移动
+            monsterController.model.status.isMoving = false
+        end
+        
+        -- 记录最后见到玩家的位置
+        monsterController.model.ai.lastSeenTarget = {x = pos.x, y = pos.y}
+        monsterController.model.ai.lastSeenTime = love.timer.getTime()
+    end
     
     return monsterController
 end
@@ -88,10 +117,10 @@ function BuildingController:getModel()
 end
 
 -- 静态方法：更新所有建筑实例
-function BuildingController.updateAll(dt)
+function BuildingController.updateAll(dt, player)
     for i = #BuildingController.instances, 1, -1 do
         local instance = BuildingController.instances[i]
-        instance:update(dt)
+        instance:update(dt, player)
         
         -- 移除已死亡的建筑
         if instance:isDead() then

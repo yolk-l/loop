@@ -2,7 +2,7 @@
 local PlayerView = {}
 PlayerView.__index = PlayerView
 
-local AnimationSystem = require('src/systems/Animation')
+local AnimationSystem = require('src/utils/Animation')
 
 -- 获取动画系统资源
 local resources = AnimationSystem.getResources()

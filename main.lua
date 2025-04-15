@@ -3,7 +3,7 @@ local PlayerController = require('src/controllers/PlayerController')
 local MapController = require('src/controllers/MapController')
 local MonsterController = require('src/controllers/MonsterController')
 local BuildingController = require('src/controllers/BuildingController')
-local ItemSystem = require('src/systems/Item')
+local ItemSystem = require('src/utils/Item')
 local CardController = require('src/controllers/CardController')
 local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
@@ -24,7 +24,7 @@ local buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
 function love.load()
     
     -- 初始化动画系统
-    local AnimationSystem = require('src/systems/Animation')
+    local AnimationSystem = require('src/utils/Animation')
     AnimationSystem.initialize()
     
     -- 使用中文字体
@@ -79,7 +79,40 @@ function love.update(dt)
     player:autoAttack(MonsterController.getInstances())
     
     -- 更新所有建筑
-    BuildingController.updateAll(dt)
+    BuildingController.updateAll(dt, player)
+    
+    -- 让所有怪物将玩家设为目标
+    for _, monster in ipairs(MonsterController.instances) do
+        monster:setTarget(player)
+        
+        -- 确保怪物有活动的追踪状态
+        if monster.model.ai.state ~= "attack" then
+            -- 获取与玩家的距离
+            local pos = player:getPosition()
+            local dx = pos.x - monster.model.x
+            local dy = pos.y - monster.model.y
+            local distance = math.sqrt(dx*dx + dy*dy)
+            
+            -- 计算理想攻击距离
+            local idealDistance = monster.model.attributes.attackRange * 0.8
+            
+            -- 如果距离在合理范围内，进入追踪状态
+            if distance <= monster.model.attributes.detectRange * 1.5 then
+                monster.model.ai.state = "chase"
+                
+                -- 如果超出理想攻击距离，则移动
+                if distance > idealDistance then
+                    monster.model.status.isMoving = true
+                else
+                    -- 否则在理想距离内停止移动
+                    monster.model.status.isMoving = false
+                end
+                
+                monster.model.ai.lastSeenTarget = {x = pos.x, y = pos.y}
+                monster.model.ai.lastSeenTime = love.timer.getTime()
+            end
+        end
+    end
     
     -- 更新所有怪物
     MonsterController.updateAll(dt, mapController.model)
@@ -253,40 +286,43 @@ function love.mousepressed(x, y, button)
             return
         end
         local selectedCard = cardController:getSelectedCard()
-        print("mousepressed2",  selectedCard , selectedCard.config)
-        -- 如果有选中的卡牌，尝试在点击位置放置建筑
-        if selectedCard and selectedCard.config then
-            -- 检查点击位置是否在地图范围内且不在手牌区域
-            if y < cardController.view.handArea.y then
-                local tileX = math.floor(x / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
-                local tileY = math.floor(y / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
+        -- 添加nil检查，防止访问nil值
+        if selectedCard then
+            print("mousepressed2", selectedCard, selectedCard.config)
+            -- 如果有选中的卡牌，尝试在点击位置放置建筑
+            if selectedCard.config then
+                -- 检查点击位置是否在地图范围内且不在手牌区域
+                if y < cardController.view.handArea.y then
+                    local tileX = math.floor(x / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
+                    local tileY = math.floor(y / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
 
-                -- 获取地形类型并进行判断
-                local terrain = mapController:getTerrainAt(tileX, tileY)
-                print("尝试在 x=" .. tileX .. ", y=" .. tileY .. " 放置建筑，地形类型: " .. (terrain or "nil"))
-                
-                -- 检查是否在玩家防御区域外
-                if not player:canBuildAt(tileX, tileY) then
-                    print("无法在玩家防御区域内建造建筑")
-                    return
-                end
-                
-                -- 检查地形是否适合该类型建筑
-                local buildingType = selectedCard.config.buildingType
-                if mapController:canBuildAt(tileX, tileY, buildingType) then
-                    -- 创建新建筑
-                    print("建筑类型: " .. (buildingType or "nil"))
+                    -- 获取地形类型并进行判断
+                    local terrain = mapController:getTerrainAt(tileX, tileY)
+                    print("尝试在 x=" .. tileX .. ", y=" .. tileY .. " 放置建筑，地形类型: " .. (terrain or "nil"))
                     
-                    if buildingType then
-                        -- 使用BuildingController创建建筑
-                        BuildingController.createBuilding(buildingType, tileX, tileY)
-                        print("成功创建建筑，当前建筑数量: " .. #BuildingController.instances)
-                        
-                        -- 使用卡牌
-                        cardController:removeCard(selectedCard)
+                    -- 检查是否在玩家防御区域外
+                    if not player:canBuildAt(tileX, tileY) then
+                        print("无法在玩家防御区域内建造建筑")
+                        return
                     end
-                else
-                    print("当前地形不适合建造此类型建筑")
+                    
+                    -- 检查地形是否适合该类型建筑
+                    local buildingType = selectedCard.config.buildingType
+                    if mapController:canBuildAt(tileX, tileY, buildingType) then
+                        -- 创建新建筑
+                        print("建筑类型: " .. (buildingType or "nil"))
+                        
+                        if buildingType then
+                            -- 使用BuildingController创建建筑
+                            BuildingController.createBuilding(buildingType, tileX, tileY)
+                            print("成功创建建筑，当前建筑数量: " .. #BuildingController.instances)
+                            
+                            -- 使用卡牌
+                            cardController:removeCard(selectedCard)
+                        end
+                    else
+                        print("当前地形不适合建造此类型建筑")
+                    end
                 end
             end
         end

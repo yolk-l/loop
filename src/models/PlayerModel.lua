@@ -3,7 +3,7 @@ local PlayerModel = {}
 PlayerModel.__index = PlayerModel
 
 -- 引入物品系统和地形配置
-local ItemSystem = require('src/systems/Item')
+local ItemSystem = require('src/utils/Item')
 local TerrainConfig = require('config/terrain')
 
 function PlayerModel:new(x, y)
@@ -143,7 +143,7 @@ end
 function PlayerModel:autoAttack(monsters)
     -- 如果正在冷却中，不进行攻击
     if self.attributes.lastAttackTime > 0 then
-        return
+        return nil
     end
     
     -- 查找范围内的怪物并攻击
@@ -151,9 +151,10 @@ function PlayerModel:autoAttack(monsters)
     local closestDistance = self.attackRadius
     
     for _, monster in ipairs(monsters) do
-        if not monster.status.isDead then
-            local dx = monster.x - self.x
-            local dy = monster.y - self.y
+        if not monster:isDead() then
+            local pos = monster:getPosition()
+            local dx = pos.x - self.x
+            local dy = pos.y - self.y
             local distance = math.sqrt(dx * dx + dy * dy)
             
             if distance < closestDistance then
@@ -165,8 +166,11 @@ function PlayerModel:autoAttack(monsters)
     
     -- 如果找到范围内的怪物，进行攻击
     if closestMonster then
-        self:attack(closestMonster)
+        -- 返回攻击结果（子弹信息）
+        return self:attack(closestMonster)
     end
+    
+    return nil  -- 没有找到怪物或无法攻击
 end
 
 function PlayerModel:attack(target)
@@ -177,9 +181,13 @@ function PlayerModel:attack(target)
     end
     
     if target then
+        -- 获取目标位置
+        local pos = target:getPosition()
+        local targetX, targetY = pos.x, pos.y
+        
         -- 计算玩家到目标的距离
-        local dx = target.x - self.x
-        local dy = target.y - self.y
+        local dx = targetX - self.x
+        local dy = targetY - self.y
         local distance = math.sqrt(dx*dx + dy*dy)
         
         -- 如果目标在攻击范围内
@@ -202,8 +210,8 @@ function PlayerModel:attack(target)
             local bulletInfo = {
                 startX = self.x,
                 startY = self.y,
-                targetX = target.x,
-                targetY = target.y,
+                targetX = targetX,
+                targetY = targetY,
                 speed = self.attributes.bulletSpeed,
                 damage = damage,
                 source = "player",
@@ -273,9 +281,10 @@ function PlayerModel:findNearestMonster(monsters)
     local minDistance = self.status.detectRange
     
     for _, monster in ipairs(monsters) do
-        if not monster.status.isDead then
-            local dx = monster.x - self.x
-            local dy = monster.y - self.y
+        if not monster:isDead() then
+            local pos = monster:getPosition()
+            local dx = pos.x - self.x
+            local dy = pos.y - self.y
             local distance = math.sqrt(dx * dx + dy * dy)
             
             if distance < minDistance then
@@ -299,9 +308,13 @@ function PlayerModel:updateAI(dt, monsters)
     
     if nearestMonster then
         self.status.targetMonster = nearestMonster
+        -- 获取目标位置
+        local pos = nearestMonster:getPosition()
+        local monsterX, monsterY = pos.x, pos.y
+        
         -- 如果在攻击范围内，进行攻击
-        local dx = nearestMonster.x - self.x
-        local dy = nearestMonster.y - self.y
+        local dx = monsterX - self.x
+        local dy = monsterY - self.y
         local distance = math.sqrt(dx * dx + dy * dy)
         
         if distance <= self.status.attackRange then

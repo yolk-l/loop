@@ -83,7 +83,7 @@ function InventoryView:draw(items, selected, x, y)
                     love.graphics.print(item.position, slotX + 5, slotY + 5)
                 else
                     -- 普通物品类型处理
-                    local AnimationSystem = require('src/systems/Animation')
+                    local AnimationSystem = require('src/utils/Animation')
                     local image = nil
                     
                     -- 根据装备类型获取对应图像
@@ -173,7 +173,7 @@ function InventoryView:drawItemTooltip()
         love.graphics.print("位置: " .. item.position .. " (只能装备到对应槽位)", tooltipX + tooltipPadding, tooltipY + tooltipPadding + 20)
         
         -- 获取符文描述
-        local ItemSystem = require('src/systems/Item')
+        local ItemSystem = require('src/utils/Item')
         -- 绘制主属性
         local statDesc = ""
         if item.primaryStat then
@@ -248,7 +248,7 @@ function InventoryView:drawItemTooltip()
         
         -- 获取图像
         local hasImage = false
-        local AnimationSystem = require('src/systems/Animation')
+        local AnimationSystem = require('src/utils/Animation')
         local image = nil
         
         if item.config.image then

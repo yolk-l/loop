@@ -3,7 +3,7 @@ local MonsterView = {}
 MonsterView.__index = MonsterView
 
 -- 引入动画系统
-local AnimationSystem = require('src/systems/Animation')
+local AnimationSystem = require('src/utils/Animation')
 local resources = AnimationSystem.getResources()
 
 -- 字体缓存
@@ -54,7 +54,7 @@ function MonsterView:draw(monsterModel)
             resources.images[monsterType] or resources.images.monster, 
             monsterModel.x, monsterModel.y, 
             0, scaleX, 1, 
-            monsterModel.config.width / 2, monsterModel.config.height / 2
+            monsterModel.config.size / 2, monsterModel.config.size / 2
         )
     else
         -- 没有动画时使用简单图形

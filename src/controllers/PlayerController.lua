@@ -7,10 +7,10 @@ local PlayerView = require('src/views/PlayerView')
 local BulletModel = require('src/models/BulletModel')
 
 function PlayerController:new(x, y)
-    local self = setmetatable({}, PlayerController)
-    self.model = PlayerModel:new(x, y)
-    self.view = PlayerView:new()
-    return self
+    local mt = setmetatable({}, PlayerController)
+    mt.model = PlayerModel:new(x, y)
+    mt.view = PlayerView:new()
+    return mt
 end
 
 function PlayerController:setMap(map)
@@ -18,29 +18,11 @@ function PlayerController:setMap(map)
 end
 
 function PlayerController:update(dt)
-    -- 更新动画
-    if self.model.animation then
-        self.model.animation:update(dt)
-    end
+    -- 调用模型的更新方法
+    self.model:update(dt)
     
-    -- 更新子弹
-    self.model:updateBullets(dt)
-    
-    -- 更新攻击冷却
-    if self.model.attributes.lastAttackTime > 0 then
-        local currentTime = love.timer.getTime()
-        if currentTime - self.model.attributes.lastAttackTime > self.model.attributes.attackCooldown then
-            self.model.attributes.lastAttackTime = 0  -- 冷却完毕
-        end
-    end
-    
-    -- 如果没有全局timer，则使用手动计时方式
-    if not gameTimer and self.model.status.isAttacking then
-        local currentTime = love.timer.getTime()
-        if currentTime - self.model.status.attackStartTime > 0.2 then
-            self.model.status.isAttacking = false  -- 攻击效果结束
-        end
-    end
+    -- 额外的控制器特有逻辑（如果有的话）
+    -- 例如：处理用户输入等
 end
 
 function PlayerController:draw()
@@ -52,58 +34,52 @@ function PlayerController:move(dx, dy, dt)
 end
 
 function PlayerController:attack(target)
-    -- 攻击逻辑实现
-    -- 例如：减少目标生命值，播放攻击动画等
+    -- 调用模型的攻击方法
+    local bulletInfo = self.model:attack(target)
+    
+    -- 如果返回了子弹信息，创建子弹
+    if bulletInfo then
+        self:createBullet(bulletInfo)
+    end
+    
+    return bulletInfo
 end
 
 function PlayerController:autoAttack(monsters)
-    -- 如果正在冷却中，不进行攻击
-    if self.model.attributes.lastAttackTime > 0 then
-        return
+    -- 直接调用模型的自动攻击方法
+    local bulletInfo = self.model:autoAttack(monsters)
+    
+    -- 如果返回了子弹信息，创建子弹
+    if bulletInfo then
+        self:createBullet(bulletInfo)
     end
     
-    -- 查找范围内的怪物并攻击
-    local closestMonster = nil
-    local closestDistance = self.model.attackRadius
-    
-    for _, monster in ipairs(monsters) do
-        if not monster.status.isDead then
-            local dx = monster.x - self.model.x
-            local dy = monster.y - self.model.y
-            local distance = math.sqrt(dx * dx + dy * dy)
-            
-            if distance < closestDistance then
-                closestDistance = distance
-                closestMonster = monster
-            end
-        end
-    end
-    
-    -- 执行攻击逻辑
-    if closestMonster then
-        self:attack(closestMonster)
-    end
+    return bulletInfo
 end
 
 function PlayerController:createBullet(bulletInfo)
-    if bulletInfo.type == "melee" then
-        -- 这是近战攻击，直接对目标造成伤害
-        if targetMonster and targetMonster.takeDamage then
-            targetMonster:takeDamage(bulletInfo.damage)
-        end
-    elseif bulletInfo.type == "ranged" then
-        -- 这是远程攻击，需要创建子弹
-        local bullet = BulletModel:new(
-            bulletInfo.bulletInfo.startX,
-            bulletInfo.bulletInfo.startY,
-            bulletInfo.bulletInfo.targetX,
-            bulletInfo.bulletInfo.targetY,
-            bulletInfo.bulletInfo.speed,
-            bulletInfo.bulletInfo.damage,
-            "player"
-        )
-        table.insert(self.model.bullets, bullet)
+    if not bulletInfo then return end
+    
+    -- 创建远程攻击子弹
+    local bullet = BulletModel:new(
+        bulletInfo.startX,
+        bulletInfo.startY,
+        bulletInfo.targetX,
+        bulletInfo.targetY,
+        bulletInfo.speed,
+        bulletInfo.damage,
+        "player"
+    )
+    
+    -- 设置子弹特殊效果
+    if bulletInfo.effects then
+        bullet.effects = bulletInfo.effects
     end
+    
+    -- 添加子弹到玩家的子弹列表
+    table.insert(self.model.bullets, bullet)
+    
+    return bullet
 end
 
 function PlayerController:getBullets()
@@ -144,12 +120,8 @@ function PlayerController:getModel()
 end
 
 function PlayerController:canBuildAt(x, y)
-    -- 防御区域内不能建造
-    local dx = x - self.model.x
-    local dy = y - self.model.y
-    local distance = math.sqrt(dx * dx + dy * dy)
-    
-    return distance > self.model.defenseRadius
+    -- 调用模型的方法
+    return self.model:canBuildAt(x, y)
 end
 
 return PlayerController 

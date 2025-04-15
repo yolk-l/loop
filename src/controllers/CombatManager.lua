@@ -2,7 +2,7 @@
 local CombatManager = {}
 CombatManager.__index = CombatManager
 
-local ItemSystem = require('src/systems/Item')
+local ItemSystem = require('src/utils/Item')
 
 function CombatManager:handleMonsterDeath(monster, player, inventoryController, cardController)
     local monsterModel = monster:getModel()
