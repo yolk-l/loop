@@ -122,6 +122,9 @@ function love.update(dt)
     -- 更新所有怪物
     MonsterController.updateAll(dt, mapController.model)
     
+    -- 处理怪物攻击逻辑 (新增)
+    CombatManager:handleMonsterAttacks(MonsterController, player)
+    
     -- 处理怪物死亡和移除
     CombatManager:processDeadMonsters(MonsterController, player, inventoryController, cardController)
     

@@ -22,21 +22,10 @@ function MonsterController.new(type, x, y)
 end
 
 function MonsterController:update(dt, map)
-    -- 更新模型状态
-    local attackResult = self.model:update(dt, map)
+    -- 只更新模型状态，不再处理攻击结果
+    self.model:update(dt, map)
     
-    -- 处理攻击结果
-    if attackResult then
-        if attackResult.type == "ranged" then
-            -- 创建子弹
-            self:createBullet(attackResult.bulletInfo)
-        elseif attackResult.type == "melee" and attackResult.source.target then
-            -- 处理近战攻击
-            if attackResult.source.target.takeDamage then
-                attackResult.source.target:takeDamage(attackResult.damage)
-            end
-        end
-    end
+    -- 攻击结果处理已移至CombatManager
 end
 
 function MonsterController:draw()

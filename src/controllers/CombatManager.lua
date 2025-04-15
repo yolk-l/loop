@@ -106,4 +106,55 @@ function CombatManager:handleBulletCollisions(player, monsterController)
     end
 end
 
+-- 集中处理怪物攻击
+function CombatManager:handleMonsterAttacks(monsterController, player)
+    -- 遍历所有怪物
+    for _, monster in ipairs(monsterController.instances) do
+        -- 获取怪物模型
+        local monsterModel = monster:getModel()
+        
+        -- 检查是否有目标且在攻击范围内
+        if monsterModel.target and not monsterModel.status.isDead then
+            -- 计算与目标的距离
+            local targetX, targetY
+            if monsterModel.target.getPosition then
+                local pos = monsterModel.target:getPosition()
+                targetX, targetY = pos.x, pos.y
+            else
+                targetX, targetY = monsterModel.target.x, monsterModel.target.y
+            end
+            
+            local dx = targetX - monsterModel.x
+            local dy = targetY - monsterModel.y
+            local distance = math.sqrt(dx * dx + dy * dy)
+            
+            -- 在攻击范围内且冷却时间已过
+            if distance <= monsterModel.attributes.attackRange and monsterModel.attributes.lastAttackTime == 0 then
+                -- 调用怪物的攻击方法
+                local attackResult = monsterModel:attack(monsterModel.target)
+                
+                -- 处理攻击结果
+                if attackResult then
+                    if attackResult.type == "ranged" then
+                        -- 创建子弹
+                        monster:createBullet(attackResult.bulletInfo)
+                    elseif attackResult.type == "melee" and attackResult.source and attackResult.source.target then
+                        -- 处理近战攻击
+                        local target = attackResult.source.target
+                        
+                        -- 目标可能是PlayerController或者PlayerModel，需要适配
+                        if target.takeDamage then
+                            -- 直接调用目标的takeDamage方法
+                            target:takeDamage(attackResult.damage)
+                        elseif target.model and target.model.takeDamage then
+                            -- 调用目标模型的takeDamage方法
+                            target.model:takeDamage(attackResult.damage)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 return CombatManager 

@@ -234,125 +234,88 @@ function MonsterModel:updateAI(dt, map)
     -- 计算理想的攻击距离 - 让怪物保持在这个位置
     local idealDistance = self.attributes.attackRange * 0.8
     
-    -- 在攻击范围内则攻击
+    -- 在攻击范围内则设置攻击状态，但不执行实际攻击
+    -- 实际攻击逻辑由CombatManager处理
     if distance <= self.attributes.attackRange then
         self.ai.state = "attack"
-        -- 确保设置攻击状态标记用于动画
-        self.status.isAttacking = true
-        self.status.attackStartTime = love.timer.getTime()
+        self.status.isMoving = false
         
-        local attackResult = self:attack(self.target)
-        
-        -- 如果在理想攻击距离之内，停止接近玩家
-        if distance <= idealDistance then
-            -- 设置为不移动状态，让怪物停止靠近
-            self.status.isMoving = false
-        end
-        
-        if attackResult then
-            -- 攻击成功，返回
-            return attackResult
-        end
-        -- 否则，继续追逐
+        -- 不再调用attack函数并返回结果
+        -- CombatManager将负责调用和处理攻击
     else
         -- 不在攻击范围内时，确保攻击状态被重置
         self.status.isAttacking = false
-    end
-    
-    -- 追逐目标
-    -- 扩大检测范围，增强怪物的追踪能力
-    if distance <= expandedDetectRange then
-        self.ai.state = "chase"
-        self.ai.lastSeenTarget = {x = targetX, y = targetY}
-        self.ai.lastSeenTime = love.timer.getTime()
         
-        -- 只有当距离大于理想攻击距离时才移动
-        if distance > idealDistance then
-            self.status.isMoving = true
-            
-            -- 提高追踪速度，但设置上限
-            local moveSpeed = self.attributes.speed * dt
-            -- 当距离较远时稍微提高移动速度以加快追踪
-            if distance > self.attributes.attackRange * 3 then
-                moveSpeed = moveSpeed * 1.2
-            end
-            
-            local speedModifier = self:getSpeedModifier(self.x, self.y, map)
-            moveSpeed = moveSpeed * speedModifier
-            
-            -- 计算新位置
-            local moveDistRatio = moveSpeed / distance
-            local newX = self.x + dx * moveDistRatio
-            local newY = self.y + dy * moveDistRatio
-            
-            -- 检查能否移动到新位置
-            if self:canMoveTo(newX, newY, map) then
-                self.x = newX
-                self.y = newY
-            else
-                -- 尝试智能避障 - 先尝试只在X方向移动
-                if self:canMoveTo(newX, self.y, map) then
-                    self.x = newX
-                -- 然后尝试只在Y方向移动
-                elseif self:canMoveTo(self.x, newY, map) then
-                    self.y = newY
-                -- 如果两个方向都无法移动，尝试对角线移动
-                else
-                    -- 对角线方向1
-                    local diagX1 = self.x + dx * moveDistRatio * 0.7
-                    local diagY1 = self.y - dy * moveDistRatio * 0.7
-                    if self:canMoveTo(diagX1, diagY1, map) then
-                        self.x = diagX1
-                        self.y = diagY1
-                    -- 对角线方向2
-                    else
-                        local diagX2 = self.x - dx * moveDistRatio * 0.7
-                        local diagY2 = self.y + dy * moveDistRatio * 0.7
-                        if self:canMoveTo(diagX2, diagY2, map) then
-                            self.x = diagX2
-                            self.y = diagY2
-                        end
-                    end
-                end
-            end
-        else
-            -- 已经在理想攻击距离内，停止移动
-            self.status.isMoving = false
-        end
-    else
-        -- 超出检测范围但之前看到过目标，朝最后看到的位置移动
-        if self.ai.lastSeenTarget and (love.timer.getTime() - self.ai.lastSeenTime) < 5 then
+        -- 追逐目标
+        -- 扩大检测范围，增强怪物的追踪能力
+        if distance <= expandedDetectRange then
             self.ai.state = "chase"
-            self.status.isMoving = true
+            self.ai.lastSeenTarget = {x = targetX, y = targetY}
+            self.ai.lastSeenTime = love.timer.getTime()
             
-            -- 向最后看到的位置移动
-            local lastDx = self.ai.lastSeenTarget.x - self.x
-            local lastDy = self.ai.lastSeenTarget.y - self.y
-            local lastDistance = math.sqrt(lastDx * lastDx + lastDy * lastDy)
-            
-            if lastDistance > 10 then
-                local moveSpeed = self.attributes.speed * dt * 0.8
+            -- 只有当距离大于理想攻击距离时才移动
+            if distance > idealDistance then
+                self.status.isMoving = true
+                
+                -- 提高追踪速度，但设置上限
+                local moveSpeed = self.attributes.speed * dt
+                -- 当距离较远时稍微提高移动速度以加快追踪
+                if distance > self.attributes.attackRange * 3 then
+                    moveSpeed = moveSpeed * 1.2
+                end
+                
                 local speedModifier = self:getSpeedModifier(self.x, self.y, map)
                 moveSpeed = moveSpeed * speedModifier
                 
-                local moveDistRatio = moveSpeed / lastDistance
-                local newX = self.x + lastDx * moveDistRatio
-                local newY = self.y + lastDy * moveDistRatio
+                -- 计算新位置
+                local moveDistRatio = moveSpeed / distance
+                local newX = self.x + dx * moveDistRatio
+                local newY = self.y + dy * moveDistRatio
                 
+                -- 检查能否移动到新位置
                 if self:canMoveTo(newX, newY, map) then
                     self.x = newX
                     self.y = newY
                 end
             else
-                -- 到达最后看到的位置，重置记忆
-                self.ai.lastSeenTarget = nil
-                self.ai.state = "wander"
+                -- 已经在理想攻击距离内，停止移动
+                self.status.isMoving = false
+            end
+        end
+    end
+    
+    -- 超出检测范围但之前看到过目标，朝最后看到的位置移动
+    if distance > expandedDetectRange and self.ai.lastSeenTarget and (love.timer.getTime() - self.ai.lastSeenTime) < 5 then
+        self.ai.state = "chase"
+        self.status.isMoving = true
+        
+        -- 向最后看到的位置移动
+        local lastDx = self.ai.lastSeenTarget.x - self.x
+        local lastDy = self.ai.lastSeenTarget.y - self.y
+        local lastDistance = math.sqrt(lastDx * lastDx + lastDy * lastDy)
+        
+        if lastDistance > 10 then
+            local moveSpeed = self.attributes.speed * dt * 0.8
+            local speedModifier = self:getSpeedModifier(self.x, self.y, map)
+            moveSpeed = moveSpeed * speedModifier
+            
+            local moveDistRatio = moveSpeed / lastDistance
+            local newX = self.x + lastDx * moveDistRatio
+            local newY = self.y + lastDy * moveDistRatio
+            
+            if self:canMoveTo(newX, newY, map) then
+                self.x = newX
+                self.y = newY
             end
         else
-            -- 完全没有目标线索，返回徘徊状态
+            -- 到达最后看到的位置，重置记忆
+            self.ai.lastSeenTarget = nil
             self.ai.state = "wander"
-            self:wander(dt, map)
         end
+    elseif distance > expandedDetectRange then
+        -- 完全没有目标线索，返回徘徊状态
+        self.ai.state = "wander"
+        self:wander(dt, map)
     end
 end
 
@@ -444,6 +407,12 @@ function MonsterModel:attack(target)
         return false
     end
     
+    -- 检查目标是否存在
+    if not target then
+        print("目标不存在，无法攻击")
+        return false
+    end
+    
     -- 获取目标位置
     local targetX, targetY
     if target.getPosition then
@@ -471,6 +440,7 @@ function MonsterModel:attack(target)
     -- 根据怪物类型选择不同的攻击方式
     if self.config.attackType == "melee" then
         -- 近战攻击：直接造成伤害，返回伤害信息
+        print(string.format("怪物[%s]发起近战攻击，伤害值:%d", self.type, self.attributes.attack))
         return {
             type = "melee",
             damage = self.attributes.attack,
@@ -480,6 +450,7 @@ function MonsterModel:attack(target)
         }
     else
         -- 远程攻击：创建子弹，返回子弹信息
+        print(string.format("怪物[%s]发起远程攻击，伤害值:%d", self.type, self.attributes.attack))
         return {
             type = "ranged",
             bulletInfo = {
