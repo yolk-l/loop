@@ -99,4 +99,9 @@ function MonsterManager:setTargetForAll(target)
     end
 end
 
+-- 获取怪物数量
+function MonsterManager:getMonsterCount()
+    return #self.monsterInstances
+end
+
 return MonsterManager 

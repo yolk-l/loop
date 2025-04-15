@@ -4,7 +4,7 @@ local MapController = require('src/controllers/MapController')
 local MonsterManager = require('src.managers.MonsterManager')  -- 引入怪物管理器
 local BuildingController = require('src/controllers/BuildingController')
 local BuildingManager = require('src.managers.BuildingManager')  -- 引入建筑管理器
-local CardController = require('src/controllers/CardController')
+local CardManager = require('src.managers.CardManager')  -- 引入卡牌管理器
 local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
 local Timer = require('lib/timer')  -- 引入timer库
@@ -24,6 +24,7 @@ local buildingPreviewX, buildingPreviewY
 local buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
 local monsterManager  -- 怪物管理器实例
 local buildingManager  -- 建筑管理器实例
+local cardManager     -- 卡牌管理器实例
 
 function love.load()
     
@@ -59,8 +60,8 @@ function love.load()
     -- 初始化建筑管理器
     buildingManager = BuildingManager.new()
     
-    -- 初始化卡牌控制器
-    cardController = CardController.new()
+    -- 初始化卡牌管理器
+    cardManager = CardManager.new()
     
     -- 初始化背包控制器
     inventoryController = InventoryController.new(30)  -- 明确指定30格容量
@@ -74,10 +75,7 @@ function love.load()
         TypeDefines.CARD_TYPES.GOBLIN_HUT,
         TypeDefines.CARD_TYPES.SKELETON_TOMB,
     }
-    for _ = 1, 3 do
-        local idx = math.random(1, 3)  -- 改为1-9，包含所有9种建筑卡牌
-        cardController:addCard(initCardTypes[idx])
-    end
+    cardManager:initStartingHand(initCardTypes)
     
     -- 将monsterManager设置到BuildingController中
     BuildingController.monsterManager = monsterManager
@@ -117,7 +115,7 @@ function love.update(dt)
     CombatManager:handleMonsterAttacks(monsterManager, player)
     
     -- 处理怪物死亡和移除
-    CombatManager:processDeadMonsters(monsterManager, player, inventoryController, cardController)
+    CombatManager:processDeadMonsters(monsterManager, player, inventoryController, cardManager)
     
     -- 处理子弹碰撞
     CombatManager:handleBulletCollisions(player, monsterManager)
@@ -157,7 +155,7 @@ function love.draw()
     end
     
     -- 绘制卡牌
-    cardController:draw()
+    cardManager:draw()
     
     -- 在最上层绘制物品提示（如果有）
     if characterUI.visible and inventoryController and inventoryController.view.selectedItemInfo then
@@ -201,18 +199,67 @@ function love.draw()
 end
 
 function drawUI()
-    -- 绘制玩家属性
-    local playerModel = player:getModel()
-    local statsY = 10
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.print(string.format("等级: %d", playerModel.attributes.level), 10, statsY)
-    love.graphics.print(string.format("经验: %d/%d", playerModel.attributes.exp, playerModel.attributes.nextLevelExp), 10, statsY + 20)
-    love.graphics.print(string.format("攻击: %d", playerModel.attributes.attack), 10, statsY + 40)
-    love.graphics.print(string.format("防御: %d", playerModel.attributes.defense), 10, statsY + 60)
+    -- 设置字体
+    love.graphics.setFont(gameFont)
     
-    -- 绘制建筑和怪物数量
-    love.graphics.print(string.format("建筑: %d", buildingManager:getCount()), 10, statsY + 80)
-    love.graphics.print(string.format("怪物: %d", #monsterManager:getInstances()), 10, statsY + 100)
+    -- 获取玩家属性
+    local playerModel = player:getModel()
+    
+    -- 绘制角色等级和经验值
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.print("等级: " .. playerModel.attributes.level, 10, 10)
+    
+    local expPercentage = playerModel.attributes.exp / playerModel.attributes.nextLevelExp
+    love.graphics.print("经验: " .. playerModel.attributes.exp .. "/" .. playerModel.attributes.nextLevelExp, 10, 30)
+    
+    -- 经验条
+    love.graphics.setColor(0.2, 0.2, 0.2)
+    love.graphics.rectangle("fill", 10, 50, 200, 20)
+    love.graphics.setColor(0, 0.7, 1)
+    love.graphics.rectangle("fill", 10, 50, 200 * expPercentage, 20)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.rectangle("line", 10, 50, 200, 20)
+    
+    -- 绘制攻击力和防御力
+    love.graphics.print("攻击: " .. math.floor(playerModel.attributes.attack), 10, 80)
+    love.graphics.print("防御: " .. math.floor(playerModel.attributes.defense), 10, 100)
+    
+    -- 绘制生命值
+    love.graphics.setColor(1, 0.1, 0.1)
+    love.graphics.print("生命: " .. math.floor(playerModel.attributes.hp) .. "/" .. math.floor(playerModel.attributes.maxHp), 10, 120)
+    
+    -- 生命条
+    local healthPercentage = playerModel.attributes.hp / playerModel.attributes.maxHp
+    love.graphics.setColor(0.2, 0.2, 0.2)
+    love.graphics.rectangle("fill", 10, 140, 200, 20)
+    love.graphics.setColor(1, 0, 0)
+    love.graphics.rectangle("fill", 10, 140, 200 * healthPercentage, 20)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.rectangle("line", 10, 140, 200, 20)
+    
+    -- 显示建筑和怪物数量
+    love.graphics.print("建筑: " .. buildingManager:getCount(), 10, 170)
+    love.graphics.print("怪物: " .. monsterManager:getMonsterCount(), 10, 190)
+    
+    -- 绘制建筑预览
+    if buildingPreviewX and cardManager:getSelectedIndex() then
+        local buildingType = cardManager:getSelectedBuildingType()
+        if buildingType then
+            -- 绘制半透明预览
+            love.graphics.setColor(buildingPreviewColor)
+            love.graphics.rectangle("fill", 
+                buildingPreviewX - 20, 
+                buildingPreviewY - 20, 
+                40, 40)
+                
+            -- 绘制边框
+            love.graphics.setColor(1, 1, 1, 0.8)
+            love.graphics.rectangle("line", 
+                buildingPreviewX - 20, 
+                buildingPreviewY - 20, 
+                40, 40)
+        end
+    end
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
@@ -247,17 +294,16 @@ function love.mousepressed(x, y, button)
         end
         
        -- 检查是否点击了手牌
-        if cardController:handleMouseClick(x, y) then
+        if cardManager:handleMouseClick(x, y) then
             return
         end
-        local selectedCard = cardController:getSelectedCard()
+        local selectedCard = cardManager:getSelectedCard()
         -- 添加nil检查，防止访问nil值
         if selectedCard then
-            print("mousepressed2", selectedCard, selectedCard.config)
             -- 如果有选中的卡牌，尝试在点击位置放置建筑
             if selectedCard.config then
                 -- 检查点击位置是否在地图范围内且不在手牌区域
-                if y < cardController.view.handArea.y then
+                if y < cardManager:getHandAreaY() then
                     local tileX = math.floor(x / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
                     local tileY = math.floor(y / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
 
@@ -283,7 +329,7 @@ function love.mousepressed(x, y, button)
                             print("成功创建建筑，当前建筑数量: " .. buildingManager:getCount())
                             
                             -- 使用卡牌
-                            cardController:removeCard(selectedCard)
+                            cardManager:removeCardFromHand(selectedCard)
                         end
                     else
                         print("当前地形不适合建造此类型建筑")
@@ -311,9 +357,9 @@ function love.mousepressed(x, y, button)
         -- 检查是否点击了建筑（尝试攻击或拆除）
         local buildings = buildingManager:getInstances()
         for _, building in ipairs(buildings) do
-            local bx, by = building:getPosition()
-            local dx = x - bx
-            local dy = y - by
+            local pos = building:getPosition()
+            local dx = x - pos.x
+            local dy = y - pos.y
             local distance = math.sqrt(dx * dx + dy * dy)
             local buildingModel = building:getModel()
             
@@ -346,12 +392,7 @@ function love.keypressed(key)
             player:setMap(mapController.model)
             
             -- 重新初始化卡牌
-            cardController = CardController.new()
-            for i = 1, 3 do
-                -- 新游戏只给基础卡牌
-                local cardType = math.random(1, 3)  -- 只用基础卡牌 1-3
-                cardController:addCard(cardType)
-            end
+            cardManager:initStartingHand(initCardTypes)
             
             -- 重新初始化背包
             inventoryController = InventoryController.new(30)  -- 明确指定30格容量
@@ -381,28 +422,28 @@ function love.keypressed(key)
             TypeDefines.CARD_TYPES.SKELETON_TOMB,
         }
         local idx = math.random(1, #cardTypes)
-        cardController:addCard(cardTypes[idx])
+        cardManager:addCardToHand(cardTypes[idx])
     end
 end
 
 -- 鼠标移动
 function love.mousemoved(x, y)
     -- 更新建筑预览位置
-    if cardController:getSelectedIndex() and not inventoryController:isOpen() then
-        local buildingType = cardController:getSelectedBuildingType()
+    if cardManager:getSelectedIndex() and not inventoryController:isOpen() then
+        local buildingType = cardManager:getSelectedBuildingType()
         if buildingType then
             -- 检查是否可以在当前位置建造
-            local canBuild = player:canBuildAt(x, y) and mapController:canBuildAt(x, y, buildingType)
-            -- 保存预览颜色
-            if canBuild then
-                buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
-            else
-                buildingPreviewColor = {1, 0.5, 0.5, 0.5}  -- 不可建造用红色表示
-            end
+            local tileX = math.floor(x / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
+            local tileY = math.floor(y / mapController.model.tileSize) * mapController.model.tileSize + mapController.model.tileSize/2
             
-            -- 更新预览位置
-            buildingPreviewX = x
-            buildingPreviewY = y
+            buildingPreviewX = tileX
+            buildingPreviewY = tileY
+            
+            -- 检查地形是否允许建造
+            local canPlace = buildingManager:canPlaceBuildingAt(tileX, tileY, buildingType, mapController.model)
+            buildingPreviewColor = canPlace and {0.5, 1, 0.5, 0.5} or {1, 0.5, 0.5, 0.5}
         end
+    else
+        buildingPreviewX = nil  -- 不显示预览
     end
 end 

@@ -110,7 +110,7 @@ function BuildingModel:getMonsterType()
 end
 
 function BuildingModel:getPosition()
-    return self.x, self.y
+    return {x = self.x, y = self.y}
 end
 
 function BuildingModel:getAttributes()

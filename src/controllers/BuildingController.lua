@@ -120,6 +120,7 @@ function BuildingController:draw()
     self.view:draw(self.model)
 end
 
+-- 获取建筑位置，返回包含 x 和 y 坐标的表 {x=number, y=number}
 function BuildingController:getPosition()
     return self.model:getPosition()
 end

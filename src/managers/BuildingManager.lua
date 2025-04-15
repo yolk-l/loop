@@ -82,4 +82,26 @@ function BuildingManager:hasBuildingAt(x, y, radius)
     return false, nil
 end
 
+-- 检查是否可以在指定位置放置建筑
+function BuildingManager:canPlaceBuildingAt(x, y, buildingType, mapModel)
+    -- 检查地图是否允许在该位置建筑
+    if not mapModel:getTerrainAt(x, y) then
+        return false -- 不在地图范围内
+    end
+    
+    -- 调用地图控制器的方法检查地形是否适合建造
+    local mapController = require('src/controllers/MapController').new()
+    if not mapController:canBuildAt(x, y, buildingType) then
+        return false -- 地形不适合建造
+    end
+    
+    -- 检查是否已有建筑存在于该位置
+    local hasBuildingAtLocation, _ = self:hasBuildingAt(x, y, 30)
+    if hasBuildingAtLocation then
+        return false -- 位置已被占用
+    end
+    
+    return true -- 可以在该位置建造
+end
+
 return BuildingManager 
