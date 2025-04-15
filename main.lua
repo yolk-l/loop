@@ -267,6 +267,12 @@ end
 
 function love.mousepressed(x, y, button)
     if button == 1 then  -- 左键点击
+        -- 检查是否点击了角色界面的关闭按钮
+        if characterUI.visible and characterUI:isCloseButtonClicked(x, y) then
+            characterUI:toggleVisibility()
+            return
+        end
+        
         -- 检查是否点击了背包物品
         if characterUI.visible then
             if inventoryController:handleMouseClick(x, y) then
