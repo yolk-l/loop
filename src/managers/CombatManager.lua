@@ -9,7 +9,7 @@ local ItemConfig = require('config/items')
 CombatManager.gameOver = false
 CombatManager.gameOverTime = 0
 
-function CombatManager:handleMonsterDeath(monster, player, inventoryController, cardController)
+function CombatManager:handleMonsterDeath(monster, player, cardController)
     local monsterModel = monster:getModel()
     -- 生成掉落物
     local drops = ItemSystem.generateDrops(monsterModel:getType(), monsterModel:getPosition().x, monsterModel:getPosition().y)
@@ -22,12 +22,6 @@ function CombatManager:handleMonsterDeath(monster, player, inventoryController, 
 
             if playerLevel >= ItemConfig.CARD_LEVEL_REQUIREMENTS[monsterModel:getTier()] then
                 cardController:addCard(cardType)
-            end
-        else
-            -- 添加装备掉落物
-            if not inventoryController:addItem(drop) then
-                -- 如果背包已满，将物品放在地上
-                table.insert(items, drop)
             end
         end
     end
@@ -62,7 +56,7 @@ function CombatManager:resetGameState()
 end
 
 -- 集中处理怪物死亡和移除
-function CombatManager:processDeadMonsters(monsterManager, player, inventoryController, cardController)
+function CombatManager:processDeadMonsters(monsterManager, player, cardController)
     -- 处理怪物死亡和掉落
     local monsters = monsterManager:getInstances()
     for i = #monsters, 1, -1 do
@@ -70,7 +64,7 @@ function CombatManager:processDeadMonsters(monsterManager, player, inventoryCont
         
         -- 如果怪物已死亡但未被移除
         if monster:isDead() then
-            self:handleMonsterDeath(monster, player, inventoryController, cardController)
+            self:handleMonsterDeath(monster, player, cardController)
         end
     end
     

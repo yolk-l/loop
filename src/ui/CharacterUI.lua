@@ -93,7 +93,7 @@ local function drawProgressBar(x, y, width, height, value, maxValue, color, back
     love.graphics.rectangle('line', x, y, width, height, 4, 4)
 end
 
-function CharacterUI:draw(player, inventoryController)
+function CharacterUI:draw(player)
     if not self.visible then return end
     
     -- 获取玩家模型数据
@@ -264,19 +264,9 @@ function CharacterUI:draw(player, inventoryController)
     love.graphics.setColor(0.9, 0.8, 0.3)
     love.graphics.print("背包", self.x + 20, self.y + 370)
     
-    -- 绘制背包
-    if inventoryController then
-        inventoryController:draw(self.x + 20, self.y + 400)
-    end
     
     -- 重置颜色
     love.graphics.setColor(1, 1, 1)
-end
-
--- 获取鼠标所在的UI槽位（装备槽等）
-function CharacterUI:getSlotAt(x, y)
-    -- 之前的装备槽逻辑已移除
-    return nil
 end
 
 return CharacterUI 

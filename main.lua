@@ -5,7 +5,6 @@ local MonsterManager = require('src.managers.MonsterManager')  -- 引入怪物�
 local BuildingController = require('src/controllers/BuildingController')
 local BuildingManager = require('src.managers.BuildingManager')  -- 引入建筑管理器
 local CardManager = require('src.managers.CardManager')  -- 引入卡牌管理器
-local InventoryController = require('src/controllers/InventoryController')
 local CharacterUI = require('src/ui/CharacterUI')
 local Timer = require('lib/timer')  -- 引入timer库
 local CombatManager = require('src.managers.CombatManager')
@@ -63,19 +62,11 @@ function love.load()
     -- 初始化卡牌管理器
     cardManager = CardManager.new()
     
-    -- 初始化背包控制器
-    inventoryController = InventoryController.new(30)  -- 明确指定30格容量
-    
     -- 初始化角色界面
     characterUI = CharacterUI.new()
     
     -- 初始化手牌
-    local initCardTypes = {
-        TypeDefines.CARD_TYPES.SLIME_NEST,
-        TypeDefines.CARD_TYPES.GOBLIN_HUT,
-        TypeDefines.CARD_TYPES.SKELETON_TOMB,
-    }
-    cardManager:initStartingHand(initCardTypes)
+    cardManager:initStartingHand()
     
     -- 将monsterManager设置到BuildingController中
     BuildingController.monsterManager = monsterManager
@@ -115,13 +106,10 @@ function love.update(dt)
     CombatManager:handleMonsterAttacks(monsterManager, player)
     
     -- 处理怪物死亡和移除
-    CombatManager:processDeadMonsters(monsterManager, player, inventoryController, cardManager)
+    CombatManager:processDeadMonsters(monsterManager, player, cardManager)
     
     -- 处理子弹碰撞
     CombatManager:handleBulletCollisions(player, monsterManager)
-    
-    -- 更新物品
-    inventoryController:updateItems(player)
 end
 
 function love.draw()
@@ -130,9 +118,6 @@ function love.draw()
     
     -- 绘制所有建筑
     buildingManager:drawAll()
-    
-    -- 绘制所有掉落物
-    inventoryController:drawItems()
     
     -- 绘制所有怪物和子弹
     monsterManager:drawAll()
@@ -151,16 +136,11 @@ function love.draw()
     
     -- 绘制角色界面
     if characterUI.visible then
-        characterUI:draw(player, inventoryController)
+        characterUI:draw(player)
     end
     
     -- 绘制卡牌
     cardManager:draw()
-    
-    -- 在最上层绘制物品提示（如果有）
-    if characterUI.visible and inventoryController and inventoryController.view.selectedItemInfo then
-        inventoryController.view:drawItemTooltip()
-    end
     
     -- 游戏结束界面
     if CombatManager:isGameOver() then
@@ -273,32 +253,6 @@ function love.mousepressed(x, y, button)
             return
         end
         
-        -- 检查是否点击了背包物品
-        if characterUI.visible then
-            if inventoryController:handleMouseClick(x, y) then
-                return
-            end
-            
-            -- 如果有选中的物品，检查是否点击了装备槽
-            local selectedItem = inventoryController:getSelectedItem()
-            if selectedItem then
-                local slot = characterUI:getSlotAt(x, y)
-                if slot then
-                    -- 符文系统已移除，不再处理符文装备
-                    print("符文系统已移除")
-                    return
-                end
-            end
-            
-            -- 检查是否点击了已装备的物品（卸下装备）
-            local slot = characterUI:getSlotAt(x, y)
-            if slot then
-                -- 符文系统已移除，不再处理符文卸下
-                print("符文系统已移除")
-                return
-            end
-        end
-        
        -- 检查是否点击了手牌
         if cardManager:handleMouseClick(x, y) then
             return
@@ -398,10 +352,7 @@ function love.keypressed(key)
             player:setMap(mapController.model)
             
             -- 重新初始化卡牌
-            cardManager:initStartingHand(initCardTypes)
-            
-            -- 重新初始化背包
-            inventoryController = InventoryController.new(30)  -- 明确指定30格容量
+            cardManager:initStartingHand()
             
             -- 重新生成地图
             mapController:regenerate()
@@ -435,7 +386,7 @@ end
 -- 鼠标移动
 function love.mousemoved(x, y)
     -- 更新建筑预览位置
-    if cardManager:getSelectedIndex() and not inventoryController:isOpen() then
+    if cardManager:getSelectedIndex() then
         local buildingType = cardManager:getSelectedBuildingType()
         if buildingType then
             -- 检查是否可以在当前位置建造

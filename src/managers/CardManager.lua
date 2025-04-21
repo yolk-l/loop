@@ -16,9 +16,16 @@ function CardManager.new()
 end
 
 -- 初始化起始手牌
-function CardManager:initStartingHand(cardTypes)
-    for _, cardType in ipairs(cardTypes) do
-        self:addCardToHand(cardType)
+function CardManager:initStartingHand()
+    
+    local initCardTypes = {
+        TypeDefines.CARD_TYPES.SLIME_NEST,
+        TypeDefines.CARD_TYPES.GOBLIN_HUT,
+        TypeDefines.CARD_TYPES.SKELETON_TOMB,
+    }
+    for i = 1,3 do
+        local idx = math.random(1, #initCardTypes)
+        self:addCardToHand(initCardTypes[idx])
     end
 end
 
