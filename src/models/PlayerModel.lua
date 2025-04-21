@@ -5,6 +5,8 @@ PlayerModel.__index = PlayerModel
 -- 引入物品系统和地形配置
 local TerrainConfig = require('config/terrain')
 local TypeDefines = require('config/type_defines')
+local ResourceModel = require('src/models/ResourceModel')
+local ResourceEffect = require('src/utils/ResourceEffect')
 
 function PlayerModel.new(x, y)
     local self = setmetatable({}, PlayerModel)
@@ -49,7 +51,10 @@ function PlayerModel.new(x, y)
         wanderTimer = 0,      -- 随机移动计时器
         wanderX = nil,        -- 随机移动目标X
         wanderY = nil,        -- 随机移动目标Y
-        detectRange = 150     -- 检测范围
+        detectRange = 150,    -- 检测范围
+        isCollecting = false, -- 是否正在采集资源
+        collectingType = nil, -- 正在采集的资源类型
+        collectTimer = 0      -- 采集计时器
     }
     -- 战斗增强效果
     self.combatEffects = {
@@ -57,6 +62,18 @@ function PlayerModel.new(x, y)
         stunChance = 0,        -- 眩晕敌人几率
         lifeSteal = 0          -- 生命偷取百分比
     }
+    
+    -- 资源系统
+    self.resourceModel = ResourceModel.new()
+    
+    -- 地形-资源类型映射
+    self.terrainResourceMap = {
+        [TerrainConfig.TERRAIN_TYPES.GRASS] = ResourceModel.TYPES.FOOD,
+        [TerrainConfig.TERRAIN_TYPES.MOUNTAIN] = ResourceModel.TYPES.WOOD,
+        [TerrainConfig.TERRAIN_TYPES.WATER] = ResourceModel.TYPES.FISH,
+        [TerrainConfig.TERRAIN_TYPES.SAND] = ResourceModel.TYPES.STONE,
+    }
+    
     return self
 end
 
@@ -95,6 +112,9 @@ function PlayerModel:update(dt)
     -- 更新子弹
     self:updateBullets(dt)
     
+    -- 更新资源系统
+    self.resourceModel:update(dt)
+    
     -- 更新攻击冷却
     if self.attributes.lastAttackTime > 0 then
         local currentTime = love.timer.getTime()
@@ -108,6 +128,14 @@ function PlayerModel:update(dt)
         local currentTime = love.timer.getTime()
         if currentTime - self.status.attackStartTime > 0.2 then
             self.status.isAttacking = false  -- 攻击效果结束
+        end
+    end
+    
+    -- 如果正在采集资源，更新采集状态
+    if self.status.isCollecting then
+        self.status.collectTimer = self.status.collectTimer - dt
+        if self.status.collectTimer <= 0 then
+            self:finishCollecting()
         end
     end
 end
@@ -275,6 +303,11 @@ function PlayerModel:updateAI(dt, monsters)
     -- 更新随机移动计时器
     self.status.wanderTimer = self.status.wanderTimer - dt
     
+    -- 如果正在采集资源，不执行其他AI行为
+    if self.status.isCollecting then
+        return false
+    end
+    
     -- 寻找最近的怪物
     local nearestMonster, monsterDistance = self:findNearestMonster(monsters)
     
@@ -314,7 +347,13 @@ function PlayerModel:updateAI(dt, monsters)
             end
         end
     else
-        -- 没有目标，随机移动
+        -- 没有怪物时，有几率采集资源
+        if math.random() < 0.02 and not self.status.isCollecting then
+            self:startCollecting()
+            return false
+        end
+        
+        -- 没有目标并且不在采集，随机移动
         if self.status.wanderTimer <= 0 or not self.status.wanderX then
             -- 选择新的随机目标
             if self.map then
@@ -355,7 +394,9 @@ function PlayerModel:updateAI(dt, monsters)
             local distance = math.sqrt(dx * dx + dy * dy)
             
             if distance < 10 then
-                -- 到达目标点，重置定时器以选择新目标
+                -- 到达目标点，开始采集资源
+                self:startCollecting()
+                -- 重置定时器以选择新目标
                 self.status.wanderTimer = 0
             else
                 -- 继续移动
@@ -435,10 +476,79 @@ function PlayerModel:move(dx, dy, dt)
     if self:canMoveTo(newX, newY) then
         self.x = newX
         self.y = newY
+        
+        -- 调试输出：检查是否靠近水域
+        if self.map and self.map:isNearWater(self.x, self.y) then
+            print("玩家靠近水域，可以钓鱼")
+        end
+        
         return true
     end
     
     return false
+end
+
+-- 获取当前地形类型
+function PlayerModel:getCurrentTerrainType()
+    if not self.map then return nil end
+    return self.map:getTerrainAt(self.x, self.y)
+end
+
+-- 开始采集资源
+function PlayerModel:startCollecting()
+    if self.status.isCollecting then return false end
+    
+    -- 获取当前地形类型
+    local terrainType = self:getCurrentTerrainType()
+    if not terrainType then return false end
+    
+    -- 获取对应的资源类型
+    local resourceType = self.terrainResourceMap[terrainType]
+    
+    -- 特殊情况：钓鱼时检查是否靠近水域
+    if not resourceType and terrainType ~= TerrainConfig.TERRAIN_TYPES.WATER and self.map:isNearWater(self.x, self.y) then
+        resourceType = ResourceModel.TYPES.FISH
+    end
+    
+    if not resourceType then return false end
+    
+    -- 检查资源冷却时间
+    if self.resourceModel:getCollectCooldown(resourceType) > 0 then
+        return false
+    end
+    
+    -- 开始采集
+    self.status.isCollecting = true
+    self.status.collectingType = resourceType
+    self.status.collectTimer = 1.0  -- 采集时间
+    
+    return true
+end
+
+-- 完成资源采集
+function PlayerModel:finishCollecting()
+    if not self.status.isCollecting then return end
+    
+    local resourceType = self.status.collectingType
+    if not resourceType then
+        self.status.isCollecting = false
+        return
+    end
+    
+    -- 收集资源
+    if self.resourceModel:collect(resourceType) then
+        -- 创建资源采集效果
+        ResourceEffect.create(self.x, self.y, resourceType, 1)
+    end
+    
+    -- 重置采集状态
+    self.status.isCollecting = false
+    self.status.collectingType = nil
+end
+
+-- 获取资源模型
+function PlayerModel:getResourceModel()
+    return self.resourceModel
 end
 
 return PlayerModel

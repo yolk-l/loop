@@ -6,6 +6,7 @@ local BuildingController = require('src/controllers/BuildingController')
 local BuildingManager = require('src.managers.BuildingManager')  -- 引入建筑管理器
 local CardManager = require('src.managers.CardManager')  -- 引入卡牌管理器
 local CharacterUI = require('src/ui/CharacterUI')
+local ResourceUI = require('src/ui/ResourceUI')  -- 引入资源UI
 local Timer = require('lib/timer')  -- 引入timer库
 local CombatManager = require('src.managers.CombatManager')
 local TypeDefines = require('config/type_defines')
@@ -24,6 +25,7 @@ local buildingPreviewColor = {0.5, 1, 0.5, 0.5}  -- 可建造用绿色表示
 local monsterManager  -- 怪物管理器实例
 local buildingManager  -- 建筑管理器实例
 local cardManager     -- 卡牌管理器实例
+local resourceUI      -- 资源UI
 
 function love.load()
     
@@ -64,6 +66,9 @@ function love.load()
     
     -- 初始化角色界面
     characterUI = CharacterUI.new()
+    
+    -- 初始化资源界面
+    resourceUI = ResourceUI.new()
     
     -- 初始化手牌
     cardManager:initStartingHand()
@@ -135,6 +140,9 @@ function love.draw()
     if characterUI.visible then
         characterUI:draw(player)
     end
+    
+    -- 绘制资源界面
+    resourceUI:draw(player)
     
     -- 绘制卡牌
     cardManager:draw()
@@ -377,6 +385,9 @@ function love.keypressed(key)
         }
         local idx = math.random(1, #cardTypes)
         cardManager:addCardToHand(cardTypes[idx])
+    elseif key == 'i' then
+        -- 切换资源界面
+        resourceUI:toggleVisibility()
     end
 end
 

@@ -36,6 +36,9 @@ function MapController:canBuildAt(x, y, type)
     -- 检查地形是否可建造
     local canBuild = false
     
+    -- 检查是否靠近水域
+    local isNearWater = self.model:isNearWater(x, y)
+    
     -- 不同的建筑对地形有不同的要求
     if type == "slime_nest" then
         canBuild = terrain == TerrainConfig.TERRAIN_TYPES.GRASS or
@@ -59,8 +62,9 @@ function MapController:canBuildAt(x, y, type)
         canBuild = terrain == TerrainConfig.TERRAIN_TYPES.MOUNTAIN or
                    terrain == TerrainConfig.TERRAIN_TYPES.VOLCANO
     elseif type == "witch_hut" then
-        canBuild = terrain == TerrainConfig.TERRAIN_TYPES.SWAMP or
-                   terrain == TerrainConfig.TERRAIN_TYPES.FOREST
+        canBuild = (terrain == TerrainConfig.TERRAIN_TYPES.SWAMP or
+                   terrain == TerrainConfig.TERRAIN_TYPES.FOREST) or
+                   (isNearWater and terrain == TerrainConfig.TERRAIN_TYPES.GRASS)
     elseif type == "dragon_cave" then
         canBuild = terrain == TerrainConfig.TERRAIN_TYPES.MOUNTAIN or
                    terrain == TerrainConfig.TERRAIN_TYPES.VOLCANO

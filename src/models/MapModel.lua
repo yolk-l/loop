@@ -489,6 +489,37 @@ function MapModel:getTerrainAt(x, y)
     return nil
 end
 
+-- 检查指定坐标是否靠近水域
+function MapModel:isNearWater(x, y)
+    -- 将像素坐标转换为网格坐标
+    local gridX = math.floor(x / self.tileSize) + 1
+    local gridY = math.floor(y / self.tileSize) + 1
+    
+    -- 检查坐标是否在地图范围内
+    if gridX < 1 or gridX > self.gridWidth or gridY < 1 or gridY > self.gridHeight then
+        return false
+    end
+    
+    -- 检查当前位置是否为水域
+    if self.tiles[gridY][gridX] == TerrainConfig.TERRAIN_TYPES.WATER then
+        return true
+    end
+    
+    -- 检查周围8个格子是否有水域
+    for dy = -1, 1 do
+        for dx = -1, 1 do
+            local nx, ny = gridX + dx, gridY + dy
+            if nx >= 1 and nx <= self.gridWidth and ny >= 1 and ny <= self.gridHeight then
+                if self.tiles[ny][nx] == TerrainConfig.TERRAIN_TYPES.WATER then
+                    return true
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
 -- 重新生成地图
 function MapModel:generate()
     self:generateMap()
@@ -526,85 +557,172 @@ end
 
 function MapModel:generateMap()
     -- 生成不同的种子用于不同的地形层
-    local waterSeed = math.random(1, 1000)
-    local forestSeed = math.random(1, 1000)
-    local sandSeed = math.random(1, 1000)
-    local mountainSeed = math.random(1, 1000)
-    local snowSeed = math.random(1, 1000)
-    local swampSeed = math.random(1, 1000)
-    local volcanoSeed = math.random(1, 1000)
+    local seed = math.random(1, 1000)
     
-    -- 初始化地图
+    -- 地形分布比例目标（百分比）
+    local targetDistribution = {
+        [TerrainConfig.TERRAIN_TYPES.GRASS] = 40,   -- 草地 40%
+        [TerrainConfig.TERRAIN_TYPES.FOREST] = 20,  -- 森林 20%
+        [TerrainConfig.TERRAIN_TYPES.WATER] = 15,   -- 水域 15%
+        [TerrainConfig.TERRAIN_TYPES.SAND] = 15,    -- 沙地 15%
+        [TerrainConfig.TERRAIN_TYPES.MOUNTAIN] = 5, -- 山地 5%
+        [TerrainConfig.TERRAIN_TYPES.SNOW] = 2,     -- 雪地 2%
+        [TerrainConfig.TERRAIN_TYPES.SWAMP] = 2,    -- 沼泽 2%
+        [TerrainConfig.TERRAIN_TYPES.VOLCANO] = 1   -- 火山 1%
+    }
+    
+    -- 第一步：生成初始噪声图
     for y = 1, self.gridHeight do
         self.tiles[y] = {}
         for x = 1, self.gridWidth do
-            -- 生成各种地形的噪声值
-            local waterNoise = self:perlinNoise(x/6, y/6, waterSeed, 4)  -- 水域
-            local forestNoise = self:perlinNoise(x/8, y/8, forestSeed, 3)  -- 森林
-            local sandNoise = self:perlinNoise(x/5, y/5, sandSeed, 2)  -- 沙地
-            local mountainNoise = self:perlinNoise(x/7, y/7, mountainSeed, 4)  -- 山地
-            local snowNoise = self:perlinNoise(x/8, y/8, snowSeed, 3)  -- 雪地
-            local swampNoise = self:perlinNoise(x/5, y/5, swampSeed, 2)  -- 沼泽
-            local volcanoNoise = self:perlinNoise(x/9, y/9, volcanoSeed, 3)  -- 火山
+            -- 生成基础噪声值
+            local noise = self:perlinNoise(x/10, y/10, seed, 4)
             
-            -- 添加全局高度图，将世界分为不同的高度区域
-            local heightNoise = self:perlinNoise(x/12, y/12, 12345, 4)
-            
-            -- 默认为草地
-            local terrainType = TerrainConfig.TERRAIN_TYPES.GRASS
-            
-            -- 根据高度和噪声值决定地形
-            if heightNoise < 0.3 then
-                -- 低地: 水域、沙地、沼泽
-                if waterNoise > 0.6 then
-                    terrainType = TerrainConfig.TERRAIN_TYPES.WATER
-                elseif sandNoise > 0.7 and waterNoise > 0.4 then
-                    terrainType = TerrainConfig.TERRAIN_TYPES.SAND
-                elseif swampNoise > 0.7 and waterNoise > 0.3 and waterNoise < 0.6 then
-                    terrainType = TerrainConfig.TERRAIN_TYPES.SWAMP
-                end
-            elseif heightNoise < 0.6 then
-                -- 中地: 草地、森林
-                if forestNoise > 0.6 then
-                    terrainType = TerrainConfig.TERRAIN_TYPES.FOREST
-                end
-                
-                -- 沿水边生成沙地和沼泽
-                if waterNoise > 0.5 and waterNoise < 0.6 then
-                    if sandNoise > 0.6 then
-                        terrainType = TerrainConfig.TERRAIN_TYPES.SAND
-                    elseif swampNoise > 0.7 then
-                        terrainType = TerrainConfig.TERRAIN_TYPES.SWAMP
-                    end
-                end
-            elseif heightNoise < 0.85 then
-                -- 高地: 山地
-                if mountainNoise > 0.6 then
-                    terrainType = TerrainConfig.TERRAIN_TYPES.MOUNTAIN
-                    
-                    -- 山顶有时有雪
-                    if heightNoise > 0.75 and snowNoise > 0.7 then
-                        terrainType = TerrainConfig.TERRAIN_TYPES.SNOW
-                    end
-                end
-            else
-                -- 最高地: 雪地，偶尔有火山
-                if volcanoNoise > 0.85 then
-                    terrainType = TerrainConfig.TERRAIN_TYPES.VOLCANO
-                else
-                    terrainType = TerrainConfig.TERRAIN_TYPES.SNOW
-                end
-            end
-            
-            self.tiles[y][x] = terrainType
+            -- 初始化为草地（默认地形）
+            self.tiles[y][x] = TerrainConfig.TERRAIN_TYPES.GRASS
         end
     end
     
-    -- 后处理：平滑地形
-    self:smoothTerrain()
+    -- 第二步：根据比例分配区域
+    -- 计算总格子数
+    local totalTiles = self.gridWidth * self.gridHeight
     
-    -- 后处理：确保水域周围有沙地或沼泽
+    -- 计算每种地形需要的格子数
+    local terrainCounts = {}
+    local remainingTiles = totalTiles
+    
+    -- 按重要性排序的地形类型
+    local terrainTypes = {
+        TerrainConfig.TERRAIN_TYPES.WATER,
+        TerrainConfig.TERRAIN_TYPES.FOREST,
+        TerrainConfig.TERRAIN_TYPES.SAND,
+        TerrainConfig.TERRAIN_TYPES.MOUNTAIN,
+        TerrainConfig.TERRAIN_TYPES.SWAMP,
+        TerrainConfig.TERRAIN_TYPES.SNOW,
+        TerrainConfig.TERRAIN_TYPES.VOLCANO
+    }
+    
+    -- 计算每种地形的目标数量
+    for _, terrainType in ipairs(terrainTypes) do
+        terrainCounts[terrainType] = math.floor(totalTiles * (targetDistribution[terrainType] / 100))
+        remainingTiles = remainingTiles - terrainCounts[terrainType]
+    end
+    
+    -- 将剩余的格子全部分配给草地
+    terrainCounts[TerrainConfig.TERRAIN_TYPES.GRASS] = remainingTiles
+    
+    -- 第三步：基于噪声生成地形簇
+    -- 为每种地形生成基于柏林噪声的起始种子点
+    local seedPoints = {}
+    
+    for _, terrainType in ipairs(terrainTypes) do
+        local points = {}
+        local count = math.ceil(terrainCounts[terrainType] / 25)  -- 每个种子点大约生成25个格子
+        
+        for i = 1, count do
+            table.insert(points, {
+                x = math.random(1, self.gridWidth),
+                y = math.random(1, self.gridHeight),
+                size = math.random(3, 6)  -- 种子点大小，决定影响范围
+            })
+        end
+        
+        seedPoints[terrainType] = points
+    end
+    
+    -- 第四步：从种子点扩散地形
+    for _, terrainType in ipairs(terrainTypes) do
+        local placedTiles = 0
+        local attempts = 0
+        local maxAttempts = terrainCounts[terrainType] * 2  -- 设置最大尝试次数以防止无限循环
+        
+        while placedTiles < terrainCounts[terrainType] and attempts < maxAttempts do
+            attempts = attempts + 1
+            
+            -- 随机选择一个种子点
+            local points = seedPoints[terrainType]
+            if #points == 0 then break end
+            
+            local pointIndex = math.random(1, #points)
+            local point = points[pointIndex]
+            
+            -- 在种子点周围生成地形
+            local centerX = point.x
+            local centerY = point.y
+            local radius = point.size
+            
+            -- 随机选择种子点周围的一个位置
+            local angle = math.random() * math.pi * 2
+            local distance = math.random() * radius
+            local targetX = math.floor(centerX + math.cos(angle) * distance)
+            local targetY = math.floor(centerY + math.sin(angle) * distance)
+            
+            -- 确保坐标在地图范围内
+            if targetX >= 1 and targetX <= self.gridWidth and targetY >= 1 and targetY <= self.gridHeight then
+                -- 如果位置未被该地形占据，则设置地形
+                if self.tiles[targetY][targetX] ~= terrainType then
+                    self.tiles[targetY][targetX] = terrainType
+                    placedTiles = placedTiles + 1
+                    
+                    -- 有几率扩展到相邻格子
+                    for ny = targetY - 1, targetY + 1 do
+                        for nx = targetX - 1, targetX + 1 do
+                            if nx >= 1 and nx <= self.gridWidth and ny >= 1 and ny <= self.gridHeight then
+                                if math.random() < 0.6 and self.tiles[ny][nx] ~= terrainType and placedTiles < terrainCounts[terrainType] then
+                                    self.tiles[ny][nx] = terrainType
+                                    placedTiles = placedTiles + 1
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- 如果种子点已经生成了足够的地形，移除它
+            if math.random() < 0.2 then
+                table.remove(seedPoints[terrainType], pointIndex)
+            end
+        end
+    end
+    
+    -- 第五步：平滑地形边界
+    for i = 1, 3 do  -- 执行多次平滑
+        self:smoothTerrain()
+    end
+    
+    -- 第六步：处理地形过渡，确保自然过渡
     self:postProcessTerrain()
+    
+    -- 第七步：确保水域周围是沙地或沼泽
+    self:enforceWaterBoundaries()
+end
+
+-- 确保水域周围有沙地或沼泽
+function MapModel:enforceWaterBoundaries()
+    local changes = {}
+    
+    for y = 2, self.gridHeight - 1 do
+        for x = 2, self.gridWidth - 1 do
+            if self.tiles[y][x] == TerrainConfig.TERRAIN_TYPES.WATER then
+                for ny = y-1, y+1 do
+                    for nx = x-1, x+1 do
+                        if self:isValidPosition(nx, ny) and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.WATER and
+                           self.tiles[ny][nx] ~= TerrainConfig.TERRAIN_TYPES.SAND then
+                            
+                            -- 大部分情况下转换为沙地
+                            table.insert(changes, {x = nx, y = ny, type = TerrainConfig.TERRAIN_TYPES.SAND})
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- 应用更改
+    for _, change in ipairs(changes) do
+        self.tiles[change.y][change.x] = change.type
+    end
 end
 
 return MapModel 
