@@ -58,22 +58,6 @@ function PlayerView:draw(playerModel)
         love.graphics.circle('fill', playerModel.x, playerModel.y, playerModel.size)
     end
     
-    -- 绘制防御区域（不可建造区域）
-    love.graphics.setColor(0.8, 0.2, 0.2, 0.15)  -- 淡红色
-    love.graphics.circle('fill', playerModel.x, playerModel.y, playerModel.defenseRadius)
-    
-    -- 绘制防御区域边界
-    love.graphics.setColor(0.8, 0.2, 0.2, 0.5)
-    love.graphics.circle('line', playerModel.x, playerModel.y, playerModel.defenseRadius)
-    
-    -- 绘制攻击范围
-    love.graphics.setColor(0.2, 0.6, 0.8, 0.1)  -- 淡蓝色
-    love.graphics.circle('fill', playerModel.x, playerModel.y, playerModel.attackRadius)
-    
-    -- 绘制攻击范围边界
-    love.graphics.setColor(0.2, 0.6, 0.8, 0.3)
-    love.graphics.circle('line', playerModel.x, playerModel.y, playerModel.attackRadius)
-    
     -- 绘制子弹
     self:drawBullets(playerModel.bullets)
     

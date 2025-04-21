@@ -84,11 +84,8 @@ function love.update(dt)
         return  -- 停止其他更新
     end
     
-    -- 更新玩家控制器
+    -- 更新玩家控制器（传入怪物实例以支持AI移动和追踪）
     player:update(dt, monsterManager:getInstances())
-    
-    -- 更新游戏逻辑
-    player:update(dt)
     
     -- 玩家自动攻击范围内的怪物
     player:autoAttack(monsterManager:getInstances())

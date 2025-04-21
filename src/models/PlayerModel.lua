@@ -266,7 +266,7 @@ function PlayerModel:findNearestMonster(monsters)
         end
     end
     
-    return nearestMonster
+    return nearestMonster, minDistance
 end
 
 function PlayerModel:updateAI(dt, monsters)
@@ -276,7 +276,7 @@ function PlayerModel:updateAI(dt, monsters)
     self.status.wanderTimer = self.status.wanderTimer - dt
     
     -- 寻找最近的怪物
-    local nearestMonster = self:findNearestMonster(monsters)
+    local nearestMonster, monsterDistance = self:findNearestMonster(monsters)
     
     if nearestMonster then
         self.status.targetMonster = nearestMonster
@@ -285,21 +285,32 @@ function PlayerModel:updateAI(dt, monsters)
         local monsterX, monsterY = pos.x, pos.y
         
         -- 如果在攻击范围内，进行攻击
-        local dx = monsterX - self.x
-        local dy = monsterY - self.y
-        local distance = math.sqrt(dx * dx + dy * dy)
-        
-        if distance <= self.status.attackRange then
+        if monsterDistance <= self.status.attackRange then
             return self:attack(nearestMonster)  -- 返回攻击结果
         else
-            -- 移动向目标
-            local moveSpeed = self.attributes.speed * dt
+            -- 移动向目标怪物
+            local dx = monsterX - self.x
+            local dy = monsterY - self.y
+            local distance = math.sqrt(dx * dx + dy * dy)
+            
+            -- 计算移动速度，根据地形可能有变化
+            local speedModifier = self:getSpeedModifier(self.x, self.y)
+            local moveSpeed = self.attributes.speed * speedModifier * dt
+            
+            -- 计算新位置
             local nx = self.x + (dx / distance) * moveSpeed
             local ny = self.y + (dy / distance) * moveSpeed
             
             if self:canMoveTo(nx, ny) then
                 self.x = nx
                 self.y = ny
+            else
+                -- 如果无法直接移动到目标，尝试只在x或y方向移动
+                if self:canMoveTo(nx, self.y) then
+                    self.x = nx
+                elseif self:canMoveTo(self.x, ny) then
+                    self.y = ny
+                end
             end
         end
     else
@@ -315,13 +326,25 @@ function PlayerModel:updateAI(dt, monsters)
                 local validTarget = false
                 
                 repeat
-                    self.status.wanderX = math.random(50, mapWidth - 50)
-                    self.status.wanderY = math.random(50, mapHeight - 50)
+                    -- 以当前位置为中心，在一定范围内选择随机目标
+                    local wanderRange = 150  -- 游荡范围
+                    local randomAngle = math.random() * math.pi * 2  -- 随机角度
+                    local randomDist = math.random(50, wanderRange)  -- 随机距离
+                    
+                    -- 计算新的目标点
+                    self.status.wanderX = self.x + math.cos(randomAngle) * randomDist
+                    self.status.wanderY = self.y + math.sin(randomAngle) * randomDist
+                    
+                    -- 确保目标点在地图范围内
+                    self.status.wanderX = math.max(50, math.min(mapWidth - 50, self.status.wanderX))
+                    self.status.wanderY = math.max(50, math.min(mapHeight - 50, self.status.wanderY))
+                    
                     validTarget = self:canMoveTo(self.status.wanderX, self.status.wanderY)
                     attempts = attempts + 1
                 until validTarget or attempts >= maxAttempts
                 
-                self.status.wanderTimer = math.random(2, 4)  -- 随机游荡时间
+                -- 设置游荡时间（2-4秒）
+                self.status.wanderTimer = math.random(2, 4)
             end
         end
         
@@ -332,7 +355,7 @@ function PlayerModel:updateAI(dt, monsters)
             local distance = math.sqrt(dx * dx + dy * dy)
             
             if distance < 10 then
-                -- 到达目标点，重置定时器
+                -- 到达目标点，重置定时器以选择新目标
                 self.status.wanderTimer = 0
             else
                 -- 继续移动
@@ -346,8 +369,15 @@ function PlayerModel:updateAI(dt, monsters)
                     self.x = nx
                     self.y = ny
                 else
-                    -- 不能移动到目标点，重新选择
-                    self.status.wanderTimer = 0
+                    -- 如果无法直接移动到目标，尝试只在x或y方向移动
+                    if self:canMoveTo(nx, self.y) then
+                        self.x = nx
+                    elseif self:canMoveTo(self.x, ny) then
+                        self.y = ny
+                    else
+                        -- 完全无法移动，重新选择目标
+                        self.status.wanderTimer = 0
+                    end
                 end
             end
         end
